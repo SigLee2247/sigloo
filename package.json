@@ -1,0 +1,14 @@
+{
+  "name": "sigloo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "check": "node --check spikes/browser-space/cdp-pipe.mjs && node --check spikes/browser-space/browser-space.mjs && node --check test/browser-space.test.mjs",
+    "spike:browser": "node spikes/browser-space/run.mjs",
+    "test": "node --test"
+  }
+}

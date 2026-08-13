@@ -1,6 +1,6 @@
 # ADR-SIGLOO-001 Browser Space technical spike boundaries
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-08-13
 
 ## Context
@@ -20,6 +20,16 @@ Before selecting a browser fork or external framework, validate what stock Chrom
 
 The spike may inspect public source, documented protocols and installed product behavior. Findings must identify
 the tested version, observed fact, inference and remaining uncertainty.
+
+## Outcome
+
+SPIKE-001 passed on Chrome 151.0.7922.110. Six CDP BrowserContexts derived the same explicit cookie and
+localStorage starting state, while mutations in one context remained isolated and the source Auth Profile stayed
+unchanged. The browser process and temporary profile were removed deterministically.
+
+The result is sufficient to accept stock Chromium as the Browser Space prototype base. It does not establish
+complete browser-profile cloning or settle the production browser distribution strategy. Those boundaries are
+recorded in ADR-SIGLOO-002.
 
 ## Not yet decided
 
