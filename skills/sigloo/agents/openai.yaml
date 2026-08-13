@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sigloo"
+  short_description: "격리된 E2E Space를 CLI로 실행하고 정리합니다"
+  default_prompt: "Use $sigloo to run this E2E task in an isolated Space and verify its cleanup."

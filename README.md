@@ -16,3 +16,17 @@ ownership, observation, evidence and cleanup consistent across drivers.
 - MCP: not part of the initial canonical interface
 
 The repository is in its technical-spike phase. No production CLI is published yet.
+
+## Prototype CLI
+
+Run the local CLI directly from the repository:
+
+```bash
+node bin/sigloo.mjs doctor --json
+node bin/sigloo.mjs run --name smoke -- node /absolute/path/to/smoke-test.mjs
+node bin/sigloo.mjs browser probe --json
+```
+
+`sigloo run` currently isolates the child command with a temporary working directory and emits a cleanup receipt
+plus a private evidence file under `.sigloo/evidence`. It is not an OS security sandbox. `browser probe` verifies
+the BrowserContext isolation primitive; arbitrary browser automation and Viewer mode are not exposed yet.
