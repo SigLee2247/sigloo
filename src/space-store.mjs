@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { chmod, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 
 const DEFAULT_TTL_MS = 30 * 60 * 1_000;
 const MAX_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -139,6 +139,20 @@ export class SpaceStore {
 
   async inspect(identifier) {
     return publicRecord(await this.#owned(identifier));
+  }
+
+  async report(identifier) {
+    const record = await this.#owned(identifier, { allowExpired: true });
+    const evidencePath = record.last_run?.evidence_path;
+    if (!evidencePath) throw new SpaceError('SPACE_REPORT_NOT_FOUND', 'Space has no completed run report', 4);
+    const expectedRoot = `${resolve(record.directories.evidence)}${sep}`;
+    const canonicalPath = resolve(evidencePath);
+    if (!canonicalPath.startsWith(expectedRoot)) throw new SpaceError('SPACE_REPORT_INVALID', 'Space report path is invalid', 5);
+    try {
+      return JSON.parse(await readFile(canonicalPath, 'utf8'));
+    } catch {
+      throw new SpaceError('SPACE_REPORT_INVALID', 'Space report cannot be read', 5);
+    }
   }
 
   async resolveRunnable(identifier) {

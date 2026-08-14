@@ -9,6 +9,7 @@ const HELP = `Usage:
   sigloo create NAME [--ttl 30m] [--json]
   sigloo list [--json]
   sigloo inspect SPACE [--json]
+  sigloo report SPACE [--json]
   sigloo complete SPACE [--json]
   sigloo destroy SPACE [--json]
   sigloo run SPACE -- COMMAND [ARG...]
@@ -21,6 +22,7 @@ Commands:
   create         Create a named persistent Space
   list           List Spaces owned by the caller
   inspect        Reconnect to a Space by name or ID
+  report         Read the latest bounded run report
   complete       Mark a Space complete while preserving artifacts
   destroy        Remove a Space and emit cleanup state
   run            Run a command in a temporary Process Space
@@ -81,6 +83,11 @@ function parseCreate(arguments_) {
 
 function humanSpace(record) {
   return `${record.id}  ${record.state}  ${record.name}  expires ${record.expires_at}\n`;
+}
+
+function humanReport(report) {
+  const cleanup = report.cleanup.resources_remaining ? 'resources remain' : 'clean';
+  return `${report.space_id}  ${report.status}  ${report.artifacts.items.length} artifacts  ${cleanup}\n`;
 }
 
 function parseSpaceIdentifier(command, arguments_) {
@@ -175,12 +182,14 @@ export async function runCli(arguments_, {
       else records.forEach((record) => output.write(humanSpace(record)));
       return 0;
     }
-    if (['inspect', 'complete', 'destroy'].includes(command)) {
+    if (['inspect', 'report', 'complete', 'destroy'].includes(command)) {
       const identifier = parseSpaceIdentifier(command, rest);
       const store = new SpaceStore();
       const record = command === 'inspect' ? await store.inspect(identifier)
-        : command === 'complete' ? await store.complete(identifier) : await store.destroy(identifier);
+        : command === 'report' ? await store.report(identifier)
+          : command === 'complete' ? await store.complete(identifier) : await store.destroy(identifier);
       if (rest.includes('--json')) printJson(record, output);
+      else if (command === 'report') output.write(humanReport(record));
       else output.write(humanSpace(record));
       return 0;
     }
@@ -231,6 +240,7 @@ export async function runCli(arguments_, {
         space_id: report.space_id,
         status: report.status,
         evidence: evidencePath,
+        artifacts: report.artifacts.items.map((artifact) => artifact.path),
         cleanup: report.cleanup,
       })}\n`);
       return report.result.exit_code ?? 1;

@@ -26,6 +26,7 @@ node bin/sigloo.mjs doctor --json
 node bin/sigloo.mjs create checkout --ttl 30m --json
 node bin/sigloo.mjs run checkout -- node /absolute/path/to/smoke-test.mjs
 node bin/sigloo.mjs inspect checkout --json
+node bin/sigloo.mjs report checkout --json
 node bin/sigloo.mjs destroy checkout --json
 node bin/sigloo.mjs run --name smoke -- node /absolute/path/to/smoke-test.mjs
 node bin/sigloo.mjs browser run --url https://app.example.test --script ./e2e.mjs --auth-profile ./auth.json
@@ -42,6 +43,12 @@ the BrowserContext isolation primitive independently from a test script.
 can override it with `SIGLOO_DATA_ROOT`. Ownership is a logical local boundary keyed by `SIGLOO_OWNER_ID` (or the
 current uid by default), not an OS security boundary. `destroy` and TTL expiry remove the Space directory and
 record cleanup separately from the test result.
+
+`sigloo run <space> -- <existing command>` does not introduce a test DSL. Existing Playwright and shell suites
+keep their original command. The child receives `SIGLOO_LOG_DIR`, `SIGLOO_TRACE_DIR`, `SIGLOO_REPORT_DIR`,
+`SIGLOO_SCREENSHOT_DIR` and `SIGLOO_ARTIFACT_DIR`; configure the existing tool to write optional outputs there.
+Sigloo always captures stdout/stderr privately and inventories artifact paths and byte counts in the bounded
+report. Use `sigloo report <space>` from a later CLI process while the Space evidence still exists.
 
 `browser run` executes a trusted local JavaScript test in a fresh, headless BrowserContext. Its explicit Auth
 Profile is owner-only and remains unchanged. See `docs/reference/AUTH-PROFILE.md` for the v1 format and current

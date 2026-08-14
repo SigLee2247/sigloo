@@ -23,6 +23,7 @@
 - loopback 전용 읽기 전용 Browser Viewer와 종료 cleanup receipt
 - 명시적 사용자 takeover·return과 상호 배타적 Browser Viewer 입력
 - 이름·소유자·TTL을 가진 persistent Space registry와 재접속 CLI
+- 기존 E2E 명령을 위한 표준 trace·report·screenshot 경로와 stdout/stderr 증적
 - process lifecycle과 cleanup receipt 실험
 - 외부 부작용 없는 로컬 테스트와 증거 작성
 

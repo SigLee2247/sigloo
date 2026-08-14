@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { access, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { access, lstat, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -34,15 +34,20 @@ test('run creates evidence and removes the Process Space directory', async () =>
       space_preserved: false,
       resources_remaining: false,
     });
+    assert.equal(receipt.artifacts.length, 2);
+    assert.ok(receipt.artifacts.some((path) => path.endsWith('/logs/stdout.log')));
+    assert.ok(receipt.artifacts.some((path) => path.endsWith('/logs/stderr.log')));
 
     const evidenceDirectory = join(invocationDirectory, '.sigloo', 'evidence');
-    const evidenceFiles = await readdir(evidenceDirectory);
+    const evidenceFiles = (await readdir(evidenceDirectory)).filter((name) => name.endsWith('.json'));
     assert.equal(evidenceFiles.length, 1);
     const report = JSON.parse(await readFile(join(evidenceDirectory, evidenceFiles[0]), 'utf8'));
     assert.equal(report.space_id, receipt.space_id);
     assert.equal(report.status, 'passed');
     assert.equal(report.isolation_level, 'temporary-working-directory');
     assert.equal(report.cleanup.resources_remaining, false);
+    assert.deepEqual(report.artifacts.items.map((artifact) => artifact.kind), ['logs', 'logs']);
+    assert.match(await readFile(report.artifacts.items.find((artifact) => artifact.path.endsWith('stdout.log')).path, 'utf8'), /child-ok/);
   } finally {
     await rm(invocationDirectory, { recursive: true, force: true });
   }
@@ -61,17 +66,26 @@ test('persistent Space reconnects across CLI processes and enforces ownership', 
 
     const run = await execFileAsync(process.execPath, [
       cli, 'run', space.id, '--', process.execPath, '-e',
-      "process.stdout.write(process.cwd() === process.env.SIGLOO_SPACE_DIR ? 'persistent-ok\\n' : 'wrong-dir\\n')",
+      "const fs=require('node:fs'); const required=['SIGLOO_ARTIFACT_DIR','SIGLOO_LOG_DIR','SIGLOO_TRACE_DIR','SIGLOO_REPORT_DIR','SIGLOO_SCREENSHOT_DIR']; if(required.some((key)=>!process.env[key])) process.exit(9); fs.writeFileSync(process.env.SIGLOO_TRACE_DIR + '/trace.zip', 'trace'); fs.writeFileSync(process.env.SIGLOO_REPORT_DIR + '/report.json', '{}'); fs.writeFileSync(process.env.SIGLOO_SCREENSHOT_DIR + '/final.png', 'png'); process.stdout.write(process.cwd() === process.env.SIGLOO_SPACE_DIR ? 'persistent-ok\\n' : 'wrong-dir\\n'); process.stderr.write('persistent-err\\n')",
     ], { env });
     assert.match(run.stdout, /persistent-ok/);
     const receiptLine = run.stdout.split('\n').find((line) => line.startsWith('SIGLOO_RECEIPT '));
     const receipt = JSON.parse(receiptLine.slice('SIGLOO_RECEIPT '.length));
     assert.equal(receipt.cleanup.space_preserved, true);
     assert.equal(receipt.cleanup.resources_remaining, false);
+    assert.equal(receipt.artifacts.length, 5);
 
     const inspected = JSON.parse((await execFileAsync(process.execPath, [cli, 'inspect', space.id, '--json'], { env })).stdout);
     assert.equal(inspected.id, space.id);
     assert.equal(inspected.last_run.status, 'passed');
+    const report = JSON.parse((await execFileAsync(process.execPath, [cli, 'report', space.id, '--json'], { env })).stdout);
+    assert.equal(report.space_id, space.id);
+    assert.deepEqual(report.timeline.map((event) => event.kind), ['observation', 'observation']);
+    assert.equal(report.failure, null);
+    assert.deepEqual(new Set(report.artifacts.items.map((artifact) => artifact.kind)), new Set(['logs', 'report', 'screenshots', 'trace']));
+    assert.match(await readFile(report.artifacts.items.find((artifact) => artifact.path.endsWith('stdout.log')).path, 'utf8'), /persistent-ok/);
+    assert.match(await readFile(report.artifacts.items.find((artifact) => artifact.path.endsWith('stderr.log')).path, 'utf8'), /persistent-err/);
+    assert.equal((await lstat(report.artifacts.items.find((artifact) => artifact.path.endsWith('stdout.log')).path)).mode & 0o077, 0);
 
     await assert.rejects(
       execFileAsync(process.execPath, [cli, 'inspect', space.id, '--json'], {
@@ -107,6 +121,8 @@ test('failed commands still produce private evidence and a clean receipt', async
       stdio: 'ignore',
     });
     assert.equal(report.status, 'failed');
+    assert.equal(report.failure.category, 'test');
+    assert.equal(report.failure.step, 'command');
     assert.equal(report.result.exit_code, 7);
     assert.equal(report.cleanup.resources_remaining, false);
     const serialized = await readFile(evidencePath, 'utf8');

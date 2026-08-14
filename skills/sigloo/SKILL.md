@@ -31,6 +31,11 @@ distinction in user-facing claims.
 For reconnectable work, use `sigloo run SPACE -- COMMAND` after `sigloo create`. Preserve the returned Space ID,
 not an internal directory path. Do not change `SIGLOO_OWNER_ID` between create, inspect, run and destroy.
 
+Do not rewrite an existing Playwright or shell suite. Run its original command after `--`. When configuring
+framework artifacts, point them at `SIGLOO_TRACE_DIR`, `SIGLOO_REPORT_DIR` and `SIGLOO_SCREENSHOT_DIR`. Read the
+latest bounded result with `sigloo report SPACE --json`; inspect raw stdout/stderr files only when necessary
+because child output may contain sensitive values.
+
 Use `--evidence-dir PATH` only when evidence must live outside the default `.sigloo/evidence` directory. Do not
 put passwords, tokens or credential values in the Space name or command arguments.
 
