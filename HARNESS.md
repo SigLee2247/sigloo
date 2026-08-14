@@ -21,6 +21,7 @@
 - Auth Profile 시작 상태의 Space별 파생과 역병합 방지 실험
 - 명시적 owner-only Auth Profile을 사용하는 same-origin Browser Space E2E
 - loopback 전용 읽기 전용 Browser Viewer와 종료 cleanup receipt
+- 명시적 사용자 takeover·return과 상호 배타적 Browser Viewer 입력
 - 이름·소유자·TTL을 가진 persistent Space registry와 재접속 CLI
 - process lifecycle과 cleanup receipt 실험
 - 외부 부작용 없는 로컬 테스트와 증거 작성

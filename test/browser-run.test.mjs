@@ -16,7 +16,7 @@ test('browser run derives Auth Profile state and leaves the source unchanged', a
   const invocationDirectory = await mkdtemp(join(tmpdir(), 'sigloo-browser-run-test-'));
   const server = createServer((_request, response) => {
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    response.end('<!doctype html><title>Sigloo browser run</title><main id="result">ready</main>');
+    response.end('<!doctype html><title>Sigloo browser run</title><main id="result">ready</main><input id="user-input" style="position:fixed;left:20px;top:20px;width:200px;height:40px">');
   });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -35,6 +35,7 @@ test('browser run derives Auth Profile state and leaves the source unchanged', a
     page.assert('cookie-derived', await page.getCookie('sigloo_session') === 'profile-cookie-secret');
     page.assert('storage-derived', await page.getLocalStorage('sigloo_auth') === 'profile-storage-secret');
     page.assert('page-loaded', await page.evaluate("document.querySelector('#result').textContent") === 'ready');
+    page.assert('takeover-input', await page.evaluate("document.querySelector('#user-input').value") === 'human42');
     await page.setCookie('sigloo_session', 'space-only-cookie');
     await page.setLocalStorage('sigloo_auth', 'space-only-storage');
     await page.screenshot('final');
@@ -50,7 +51,7 @@ test('browser run derives Auth Profile state and leaves the source unchanged', a
       viewer: true,
       viewerHoldMs: 0,
       async onViewerReady({ url: viewerUrl, mode, controlOwner }) {
-        assert.equal(mode, 'read-only');
+        assert.equal(mode, 'takeover-capable');
         assert.equal(controlOwner, 'agent');
         const page = await fetch(viewerUrl);
         assert.equal(page.status, 200);
@@ -59,6 +60,18 @@ test('browser run derives Auth Profile state and leaves the source unchanged', a
         assert.equal(frame.status, 200);
         assert.deepEqual([...Buffer.from(await frame.arrayBuffer()).subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
         assert.equal((await fetch(viewerUrl, { method: 'POST' })).status, 405);
+        const controlUrl = viewerUrl.replace('/space/', '/control/');
+        const inputUrl = viewerUrl.replace('/space/', '/input/');
+        assert.equal((await fetch(`${controlUrl}/takeover`, { method: 'POST', body: '{}' })).status, 200);
+        for (const input of [
+          { type: 'pointer', x: 40, y: 40, button: 'left' },
+          ...[...'human42'].map((key) => ({ type: 'key', key })),
+        ]) {
+          assert.equal((await fetch(inputUrl, {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input),
+          })).status, 202);
+        }
+        assert.equal((await fetch(`${controlUrl}/return`, { method: 'POST', body: '{}' })).status, 200);
       },
     });
     assert.equal(report.status, 'passed');
@@ -66,6 +79,7 @@ test('browser run derives Auth Profile state and leaves the source unchanged', a
       { name: 'cookie-derived', passed: true },
       { name: 'storage-derived', passed: true },
       { name: 'page-loaded', passed: true },
+      { name: 'takeover-input', passed: true },
     ]);
     assert.equal(report.auth_profile.unchanged, true);
     assert.equal(report.artifacts.length, 1);
@@ -74,17 +88,21 @@ test('browser run derives Auth Profile state and leaves the source unchanged', a
     assert.equal(report.cleanup.resources_remaining, false);
     assert.deepEqual(report.viewer, {
       enabled: true,
-      mode: 'read-only',
+      mode: 'takeover-capable',
       control_owner: 'agent',
       page_requests: 1,
       frame_requests: 1,
       rejected_mutations: 1,
+      takeover_count: 1,
+      return_count: 1,
+      input_events: 8,
       closed: true,
     });
     assert.equal(report.cleanup.viewer_closed, true);
     assert.equal(await readFile(profilePath, 'utf8'), profileBytes);
     const evidence = await readFile(evidencePath, 'utf8');
     assert.doesNotMatch(evidence, /profile-cookie-secret|profile-storage-secret|space-only-cookie|space-only-storage/);
+    assert.doesNotMatch(evidence, /human42/);
     assert.doesNotMatch(evidence, /127\.0\.0\.1:\d+\/space\//);
   } finally {
     server.close();
@@ -123,7 +141,7 @@ test('browser run CLI emits a bounded receipt', async () => {
     const viewerLine = stdout.split('\n').find((line) => line.startsWith('SIGLOO_VIEWER '));
     assert.ok(viewerLine);
     const viewer = JSON.parse(viewerLine.slice('SIGLOO_VIEWER '.length));
-    assert.equal(viewer.mode, 'read-only');
+    assert.equal(viewer.mode, 'takeover-capable');
     assert.equal(viewer.control_owner, 'agent');
     assert.match(viewer.url, /^http:\/\/127\.0\.0\.1:\d+\/space\/[a-f0-9]{48}$/);
     const receiptLine = stdout.split('\n').find((line) => line.startsWith('SIGLOO_RECEIPT '));

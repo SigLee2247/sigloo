@@ -8,3 +8,4 @@
 | ADR-SIGLOO-004 | accepted | Explicit Auth Profile Browser Run |
 | ADR-SIGLOO-005 | accepted | Loopback-only read-only Browser Viewer |
 | ADR-SIGLOO-006 | accepted | Persistent owner-scoped Space lifecycle |
+| ADR-SIGLOO-007 | accepted | Explicit exclusive Viewer takeover and return |

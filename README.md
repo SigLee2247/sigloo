@@ -45,5 +45,7 @@ record cleanup separately from the test result.
 
 `browser run` executes a trusted local JavaScript test in a fresh, headless BrowserContext. Its explicit Auth
 Profile is owner-only and remains unchanged. See `docs/reference/AUTH-PROFILE.md` for the v1 format and current
-same-origin boundary. `--viewer` prints a temporary loopback URL that shows the current frame without adding
-click, keyboard or form-control routes. It closes with the run and does not provide takeover.
+same-origin boundary. `--viewer` prints a temporary loopback URL. It begins read-only; `Take control` pauses
+agent browser actions and enables bounded pointer/key input until `Return to agent` is selected. Closing during
+takeover interrupts waiting agent work. The Viewer closes with the run, and its token and input values are never
+written to evidence.

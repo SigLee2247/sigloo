@@ -82,6 +82,28 @@ export class BrowserSpace {
     return Buffer.from(data, 'base64');
   }
 
+  async dispatchInput(event) {
+    if (!event || typeof event !== 'object') throw new Error('Viewer input must be an object');
+    if (event.type === 'pointer') {
+      const { x, y, button } = event;
+      if (![x, y].every((value) => Number.isFinite(value) && value >= 0 && value <= 10_000) || button !== 'left') {
+        throw new Error('Viewer pointer input is invalid');
+      }
+      await this.cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button, clickCount: 1 }, this.sessionId);
+      await this.cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button, clickCount: 1 }, this.sessionId);
+      return;
+    }
+    if (event.type === 'key') {
+      const { key } = event;
+      if (typeof key !== 'string' || key.length === 0 || key.length > 32) throw new Error('Viewer key input is invalid');
+      const text = [...key].length === 1 ? key : undefined;
+      await this.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key, text }, this.sessionId);
+      await this.cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key }, this.sessionId);
+      return;
+    }
+    throw new Error('Viewer input type is not supported');
+  }
+
   async dispose() {
     await this.cdp.send('Target.disposeBrowserContext', { browserContextId: this.browserContextId });
   }

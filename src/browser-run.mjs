@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { BrowserSpace } from './browser/browser-space.mjs';
 import { CdpPipe } from './browser/cdp-pipe.mjs';
 import { loadAuthProfile, sha256 } from './browser/auth-profile.mjs';
-import { ReadOnlyViewer } from './viewer/read-only-viewer.mjs';
+import { BrowserViewer } from './viewer/read-only-viewer.mjs';
 
 const DEFAULT_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
@@ -86,7 +86,7 @@ export async function runBrowserTestSpace({
   const artifacts = [];
   let cdp;
   let space;
-  let readOnlyViewer;
+  let browserViewer;
   let status = 'failed';
   let failure = null;
   let browserExited = true;
@@ -101,20 +101,27 @@ export async function runBrowserTestSpace({
     ]);
     space = await BrowserSpace.create(cdp, initialUrl, loadedProfile.profile);
     if (viewer) {
-      readOnlyViewer = new ReadOnlyViewer({ captureFrame: () => space.captureScreenshot() });
-      const viewerUrl = await readOnlyViewer.start();
+      browserViewer = new BrowserViewer({
+        captureFrame: () => space.captureScreenshot(),
+        dispatchInput: (event) => space.dispatchInput(event),
+      });
+      const viewerUrl = await browserViewer.start();
       await onViewerReady({
-        spaceId: id, url: viewerUrl, mode: 'read-only', controlOwner: 'agent',
+        spaceId: id, url: viewerUrl, mode: 'takeover-capable', controlOwner: 'agent',
       });
     }
+    const withAgentControl = async (operation) => {
+      if (browserViewer) await browserViewer.waitForAgentControl();
+      return operation();
+    };
     const api = Object.freeze({
       spaceId: id,
-      goto: (target) => space.goto(target),
-      evaluate: (expression) => space.evaluate(expression),
-      getCookie: (key) => space.getCookie(key),
-      setCookie: (key, value) => space.setCookie(key, value),
-      getLocalStorage: (key) => space.getLocalStorage(key),
-      setLocalStorage: (key, value) => space.setLocalStorage(key, value),
+      goto: (target) => withAgentControl(() => space.goto(target)),
+      evaluate: (expression) => withAgentControl(() => space.evaluate(expression)),
+      getCookie: (key) => withAgentControl(() => space.getCookie(key)),
+      setCookie: (key, value) => withAgentControl(() => space.setCookie(key, value)),
+      getLocalStorage: (key) => withAgentControl(() => space.getLocalStorage(key)),
+      setLocalStorage: (key, value) => withAgentControl(() => space.setLocalStorage(key, value)),
       assert(assertionName, condition) {
         validateName(assertionName, 'Assertion name');
         if (checks.some((check) => check.name === assertionName)) {
@@ -125,6 +132,7 @@ export async function runBrowserTestSpace({
         if (!passed) throw new Error('Named browser assertion failed');
       },
       async screenshot(artifactName) {
+        if (browserViewer) await browserViewer.waitForAgentControl();
         validateName(artifactName, 'Artifact name');
         if (artifacts.some((artifact) => artifact.name === artifactName)) {
           throw new Error('Artifact names must be unique');
@@ -144,11 +152,11 @@ export async function runBrowserTestSpace({
       message_digest: sha256(Buffer.from(String(error?.message ?? 'unknown failure'))),
     };
   } finally {
-    if (readOnlyViewer && viewerHoldMs > 0) {
+    if (browserViewer && viewerHoldMs > 0) {
       await new Promise((resolveHold) => setTimeout(resolveHold, viewerHoldMs));
     }
-    if (readOnlyViewer) {
-      try { await readOnlyViewer.close(); } catch { /* Cleanup invariant records the failure. */ }
+    if (browserViewer) {
+      try { await browserViewer.close(); } catch { /* Cleanup invariant records the failure. */ }
     }
     if (space) {
       try { await space.dispose(); } catch { /* Browser.close remains the final boundary. */ }
@@ -168,8 +176,8 @@ export async function runBrowserTestSpace({
   const cleanup = {
     browser_exited: browserExited,
     temporary_profile_removed: temporaryProfileRemoved,
-    viewer_closed: readOnlyViewer ? readOnlyViewer.closed : true,
-    resources_remaining: !(browserExited && temporaryProfileRemoved && (!readOnlyViewer || readOnlyViewer.closed)),
+    viewer_closed: browserViewer ? browserViewer.closed : true,
+    resources_remaining: !(browserExited && temporaryProfileRemoved && (!browserViewer || browserViewer.closed)),
   };
   if (cleanup.resources_remaining || !authProfileUnchanged) {
     status = 'failed';
@@ -188,13 +196,16 @@ export async function runBrowserTestSpace({
     started_at: startedAt,
     finished_at: new Date().toISOString(),
     browser: { executable: basename(chromePath), headless: true },
-    viewer: readOnlyViewer ? readOnlyViewer.report() : {
+    viewer: browserViewer ? browserViewer.report() : {
       enabled: false,
       mode: null,
       control_owner: null,
       page_requests: 0,
       frame_requests: 0,
       rejected_mutations: 0,
+      takeover_count: 0,
+      return_count: 0,
+      input_events: 0,
       closed: true,
     },
     test: { script_digest: loadedTest.digest, checks },

@@ -56,9 +56,9 @@ Assume headless execution unless the user requests visibility. Add `--viewer` on
 URL from the `SIGLOO_VIEWER` line for observation; it is loopback-only, read-only and closes with the run. Use
 `--viewer-hold-ms N` only for a bounded final-frame viewing window. Never print or persist the URL in evidence.
 
-Viewer does not provide takeover. Do not click or type through another browser or claim that control transferred.
-
-If the user takes control of a future Viewer, stop agent actions until ownership is explicitly returned.
+Viewer is read-only until the user explicitly selects `Take control`. While the Viewer reports user control, do
+not issue separate browser operations or work around the control gate. Resume only after `Return to agent` is
+confirmed. If the Viewer closes during takeover, treat the interrupted agent operation as a failed run.
 
 ## Completion gate
 
