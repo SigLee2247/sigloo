@@ -26,6 +26,7 @@
 - 기존 E2E 명령을 위한 표준 trace·report·screenshot 경로와 stdout/stderr 증적
 - process lifecycle과 cleanup receipt 실험
 - content-addressed 로컬 CLI 설치·업데이트·제거와 Codex Skill 설치
+- 요소 참조 기반 Browser Actions와 역순 cleanup Supervisor receipt
 - 외부 부작용 없는 로컬 테스트와 증거 작성
 
 ## 현재 금지 범위

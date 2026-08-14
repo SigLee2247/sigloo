@@ -11,3 +11,4 @@
 | ADR-SIGLOO-007 | accepted | Explicit exclusive Viewer takeover and return |
 | ADR-SIGLOO-008 | accepted | Tool-agnostic existing-command evidence contract |
 | ADR-SIGLOO-009 | accepted | Content-addressed local CLI and companion Skill installation |
+| ADR-SIGLOO-010 | accepted | Reference-based Browser Actions and ordered resource supervision |

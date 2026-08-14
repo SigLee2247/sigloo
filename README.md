@@ -78,3 +78,8 @@ same-origin boundary. `--viewer` prints a temporary loopback URL. It begins read
 agent browser actions and enables bounded pointer/key input until `Return to agent` is selected. Closing during
 takeover interrupts waiting agent work. The Viewer closes with the run, and its token and input values are never
 written to evidence.
+
+Browser test modules can use `snapshot()` to receive bounded, Space-local element references, then call
+`click(ref)`, `fill(ref, text)` or `key(ref, key)`. Fill text and key values are excluded from action evidence.
+Every browser resource is registered with the run Supervisor and closed in reverse dependency order; cleanup
+reports both individual resource results and the final `resources_remaining` invariant.

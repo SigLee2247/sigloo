@@ -46,6 +46,9 @@ export default async function (page) {
 }
 ```
 
-The API provides `goto`, `evaluate`, cookie and localStorage getters/setters, named `assert` and `screenshot`.
+The API provides `goto`, `evaluate`, cookie and localStorage getters/setters, named `assert`, `screenshot`, and
+reference-based `snapshot`, `click`, `fill` and `key` actions. Take a new snapshot after navigation or a material
+DOM change; element references are intentionally Space-local and short-lived. Action evidence records only the
+action, element reference, status and time, never fill text or key values.
 Navigation is limited to the Auth Profile origin. The script runs as trusted local code in the Sigloo process;
 BrowserContext isolation is not an OS security sandbox.

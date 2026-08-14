@@ -7,6 +7,7 @@ import { BrowserSpace } from './browser/browser-space.mjs';
 import { CdpPipe } from './browser/cdp-pipe.mjs';
 import { loadAuthProfile, sha256 } from './browser/auth-profile.mjs';
 import { BrowserViewer } from './viewer/read-only-viewer.mjs';
+import { ResourceSupervisor } from './supervisor/resource-supervisor.mjs';
 
 const DEFAULT_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
@@ -79,11 +80,14 @@ export async function runBrowserTestSpace({
   const id = createSpaceId(name);
   const startedAt = new Date().toISOString();
   const temporaryProfile = await mkdtemp(join(tmpdir(), 'sigloo-browser-run-'));
+  const supervisor = new ResourceSupervisor();
+  supervisor.register('temporary-profile', () => rm(temporaryProfile, { recursive: true, force: true }));
   const evidenceRoot = resolve(invocationDirectory, evidenceDirectory);
   const artifactRoot = join(evidenceRoot, `${id}-artifacts`);
   const evidencePath = join(evidenceRoot, `${id}.json`);
   const checks = [];
   const artifacts = [];
+  const actions = [];
   let cdp;
   let space;
   let browserViewer;
@@ -92,6 +96,7 @@ export async function runBrowserTestSpace({
   let browserExited = true;
   let temporaryProfileRemoved = false;
   let authProfileUnchanged = false;
+  let supervisorReceipt;
 
   try {
     cdp = await CdpPipe.launch(chromePath, [
@@ -99,13 +104,16 @@ export async function runBrowserTestSpace({
       '--no-first-run', '--no-default-browser-check', '--disable-background-networking',
       '--disable-component-update', '--disable-sync', 'about:blank',
     ]);
+    supervisor.register('browser-process', () => cdp.close());
     space = await BrowserSpace.create(cdp, initialUrl, loadedProfile.profile);
+    supervisor.register('browser-context', () => space.dispose());
     if (viewer) {
       browserViewer = new BrowserViewer({
         captureFrame: () => space.captureScreenshot(),
         dispatchInput: (event) => space.dispatchInput(event),
       });
       const viewerUrl = await browserViewer.start();
+      supervisor.register('viewer', () => browserViewer.close());
       await onViewerReady({
         spaceId: id, url: viewerUrl, mode: 'takeover-capable', controlOwner: 'agent',
       });
@@ -113,6 +121,22 @@ export async function runBrowserTestSpace({
     const withAgentControl = async (operation) => {
       if (browserViewer) await browserViewer.waitForAgentControl();
       return operation();
+    };
+    const performAction = async (action, targetRef, operation) => {
+      if (actions.length >= 2_000) throw new Error('Browser action limit exceeded');
+      const startedAt = new Date().toISOString();
+      actions.push({ action, target_ref: targetRef, status: 'started', at: startedAt });
+      try {
+        const result = await withAgentControl(operation);
+        actions.push({
+          action, target_ref: targetRef, status: 'passed', at: new Date().toISOString(),
+          ...(action === 'snapshot' ? { element_count: result.elements.length } : {}),
+        });
+        return result;
+      } catch (error) {
+        actions.push({ action, target_ref: targetRef, status: 'failed', at: new Date().toISOString() });
+        throw error;
+      }
     };
     const api = Object.freeze({
       spaceId: id,
@@ -122,6 +146,10 @@ export async function runBrowserTestSpace({
       setCookie: (key, value) => withAgentControl(() => space.setCookie(key, value)),
       getLocalStorage: (key) => withAgentControl(() => space.getLocalStorage(key)),
       setLocalStorage: (key, value) => withAgentControl(() => space.setLocalStorage(key, value)),
+      snapshot: () => performAction('snapshot', null, () => space.snapshot()),
+      click: (ref) => performAction('click', ref, () => space.click(ref)),
+      fill: (ref, value) => performAction('fill', ref, () => space.fill(ref, value)),
+      key: (ref, key) => performAction('key', ref, () => space.key(ref, key)),
       assert(assertionName, condition) {
         validateName(assertionName, 'Assertion name');
         if (checks.some((check) => check.name === assertionName)) {
@@ -155,15 +183,8 @@ export async function runBrowserTestSpace({
     if (browserViewer && viewerHoldMs > 0) {
       await new Promise((resolveHold) => setTimeout(resolveHold, viewerHoldMs));
     }
-    if (browserViewer) {
-      try { await browserViewer.close(); } catch { /* Cleanup invariant records the failure. */ }
-    }
-    if (space) {
-      try { await space.dispose(); } catch { /* Browser.close remains the final boundary. */ }
-    }
-    if (cdp) await cdp.close();
+    supervisorReceipt = await supervisor.shutdown();
     browserExited = cdp ? !cdp.isRunning : true;
-    await rm(temporaryProfile, { recursive: true, force: true });
     try { await access(temporaryProfile); } catch { temporaryProfileRemoved = true; }
     try {
       const currentProfile = await readFile(loadedProfile.path);
@@ -177,7 +198,8 @@ export async function runBrowserTestSpace({
     browser_exited: browserExited,
     temporary_profile_removed: temporaryProfileRemoved,
     viewer_closed: browserViewer ? browserViewer.closed : true,
-    resources_remaining: !(browserExited && temporaryProfileRemoved && (!browserViewer || browserViewer.closed)),
+    resources_remaining: supervisorReceipt.resources_remaining || !(browserExited && temporaryProfileRemoved && (!browserViewer || browserViewer.closed)),
+    supervisor: supervisorReceipt,
   };
   if (cleanup.resources_remaining || !authProfileUnchanged) {
     status = 'failed';
@@ -208,7 +230,7 @@ export async function runBrowserTestSpace({
       input_events: 0,
       closed: true,
     },
-    test: { script_digest: loadedTest.digest, checks },
+    test: { script_digest: loadedTest.digest, checks, actions },
     auth_profile: {
       digest: loadedProfile.digest,
       origin: loadedProfile.profile.origin,

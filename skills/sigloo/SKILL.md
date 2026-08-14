@@ -54,6 +54,10 @@ sigloo browser run --name account-e2e --url https://app.example.test \
 Read `docs/reference/AUTH-PROFILE.md` in the installed Sigloo package before creating a profile or test module.
 Use `sigloo browser probe --json` only to diagnose the BrowserContext isolation primitive.
 
+Prefer `snapshot`, `click`, `fill` and `key` over arbitrary `evaluate` calls for normal interaction. Take a fresh
+snapshot after navigation or material DOM changes. Never print fill text, key values, cookie values or storage
+values; verify outcomes with named assertions instead.
+
 Never read or copy a user's existing browser profile unless a future Sigloo command explicitly requests approval
 for import. Auth Profile state must be explicit, Space-local and non-merging. Do not print values returned by
 cookie or localStorage getters.

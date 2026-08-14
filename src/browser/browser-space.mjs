@@ -5,6 +5,7 @@ export class BrowserSpace {
     this.targetId = targetId;
     this.sessionId = sessionId;
     this.origin = origin;
+    this.elementReferences = new Map();
   }
 
   static async create(cdp, initialUrl, authProfile) {
@@ -75,6 +76,107 @@ export class BrowserSpace {
     }, this.sessionId);
     if (exceptionDetails) throw new Error('Browser evaluation failed');
     return result.value;
+  }
+
+  async snapshot() {
+    const elements = await this.evaluate(`(() => {
+      const selectorFor = (element) => {
+        if (element.id) return '#' + CSS.escape(element.id);
+        const parts = [];
+        for (let current = element; current && current.nodeType === Node.ELEMENT_NODE; current = current.parentElement) {
+          const tag = current.tagName.toLowerCase();
+          const siblings = current.parentElement
+            ? [...current.parentElement.children].filter((item) => item.tagName === current.tagName)
+            : [];
+          parts.unshift(siblings.length > 1 ? tag + ':nth-of-type(' + (siblings.indexOf(current) + 1) + ')' : tag);
+          if (current === document.body) break;
+        }
+        return parts.join(' > ');
+      };
+      const roleFor = (element) => element.getAttribute('role') || ({
+        A: 'link', BUTTON: 'button', INPUT: element.type === 'checkbox' ? 'checkbox' : 'textbox',
+        TEXTAREA: 'textbox', SELECT: 'combobox'
+      })[element.tagName] || 'element';
+      return [...document.querySelectorAll('a,button,input,textarea,select,[role],[contenteditable="true"]')]
+        .filter((element) => element.getClientRects().length > 0)
+        .slice(0, 500)
+        .map((element) => ({
+          selector: selectorFor(element),
+          role: roleFor(element),
+          name: String(element.getAttribute('aria-label') || element.getAttribute('placeholder') ||
+            element.getAttribute('alt') || ((element.tagName === 'BUTTON' || element.tagName === 'A') ? element.textContent : '') || '')
+            .replace(/\\s+/g, ' ').trim().slice(0, 120),
+          disabled: Boolean(element.disabled || element.getAttribute('aria-disabled') === 'true')
+        }));
+    })()`);
+    this.elementReferences.clear();
+    return {
+      url: await this.evaluate('location.href'),
+      title: String(await this.evaluate('document.title')).slice(0, 200),
+      elements: elements.map((element, index) => {
+        const ref = `e${index + 1}`;
+        this.elementReferences.set(ref, element.selector);
+        return { ref, role: element.role, name: element.name, disabled: element.disabled };
+      }),
+      truncated: elements.length === 500,
+    };
+  }
+
+  resolveElementReference(ref) {
+    if (typeof ref !== 'string' || !/^e[1-9][0-9]{0,3}$/.test(ref)) throw new Error('Element reference is invalid');
+    const selector = this.elementReferences.get(ref);
+    if (!selector) throw new Error('Element reference is stale; take a new snapshot');
+    return selector;
+  }
+
+  async click(ref) {
+    const selector = this.resolveElementReference(ref);
+    const clicked = await this.evaluate(`(() => {
+      const element = document.querySelector(${JSON.stringify(selector)});
+      if (!element || element.disabled || element.getAttribute('aria-disabled') === 'true') return false;
+      element.click();
+      return true;
+    })()`);
+    if (!clicked) throw new Error('Element is missing or disabled');
+  }
+
+  async fill(ref, value) {
+    if (typeof value !== 'string' || value.length > 65_536) throw new Error('Fill value must be a string of at most 65536 characters');
+    const selector = this.resolveElementReference(ref);
+    const filled = await this.evaluate(`(() => {
+      const element = document.querySelector(${JSON.stringify(selector)});
+      if (!element || element.disabled || element.readOnly || !('value' in element)) return false;
+      const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+      if (setter) setter.call(element, ${JSON.stringify(value)}); else element.value = ${JSON.stringify(value)};
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      element.focus();
+      return true;
+    })()`);
+    if (!filled) throw new Error('Element cannot be filled');
+  }
+
+  async key(ref, key) {
+    if (typeof key !== 'string' || key.length === 0 || key.length > 32) throw new Error('Key must be 1-32 characters');
+    const selector = this.resolveElementReference(ref);
+    const focused = await this.evaluate(`(() => {
+      const element = document.querySelector(${JSON.stringify(selector)});
+      if (!element || element.disabled) return false;
+      element.focus();
+      return document.activeElement === element;
+    })()`);
+    if (!focused) throw new Error('Element cannot receive keyboard input');
+    if ([...key].length === 1) {
+      await this.cdp.send('Input.insertText', { text: key }, this.sessionId);
+      return;
+    }
+    const special = { Enter: 13, Tab: 9, Escape: 27, Backspace: 8, Delete: 46 }[key];
+    if (!special) throw new Error('Unsupported named key');
+    await this.cdp.send('Input.dispatchKeyEvent', {
+      type: 'rawKeyDown', key, code: key, windowsVirtualKeyCode: special,
+    }, this.sessionId);
+    await this.cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode: special }, this.sessionId);
   }
 
   async captureScreenshot() {

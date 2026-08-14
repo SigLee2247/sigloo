@@ -16,7 +16,7 @@ test('browser run derives Auth Profile state and leaves the source unchanged', a
   const invocationDirectory = await mkdtemp(join(tmpdir(), 'sigloo-browser-run-test-'));
   const server = createServer((_request, response) => {
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    response.end('<!doctype html><title>Sigloo browser run</title><main id="result">ready</main><input id="user-input" style="position:fixed;left:20px;top:20px;width:200px;height:40px">');
+    response.end('<!doctype html><title>Sigloo browser run</title><main id="result">ready</main><input id="user-input" aria-label="Account" style="position:fixed;left:20px;top:20px;width:200px;height:40px"><button id="submit" onclick="document.querySelector(`#result`).textContent=`submitted`">Submit</button>');
   });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -36,6 +36,15 @@ test('browser run derives Auth Profile state and leaves the source unchanged', a
     page.assert('storage-derived', await page.getLocalStorage('sigloo_auth') === 'profile-storage-secret');
     page.assert('page-loaded', await page.evaluate("document.querySelector('#result').textContent") === 'ready');
     page.assert('takeover-input', await page.evaluate("document.querySelector('#user-input').value") === 'human42');
+    const snapshot = await page.snapshot();
+    const input = snapshot.elements.find((element) => element.name === 'Account');
+    const submit = snapshot.elements.find((element) => element.name === 'Submit');
+    page.assert('semantic-elements', Boolean(input && submit));
+    await page.fill(input.ref, 'agent-secret-value');
+    await page.key(input.ref, 'x');
+    await page.click(submit.ref);
+    page.assert('semantic-fill-key', await page.evaluate("document.querySelector('#user-input').value") === 'agent-secret-valuex');
+    page.assert('semantic-click', await page.evaluate("document.querySelector('#result').textContent") === 'submitted');
     await page.setCookie('sigloo_session', 'space-only-cookie');
     await page.setLocalStorage('sigloo_auth', 'space-only-storage');
     await page.screenshot('final');
@@ -80,6 +89,9 @@ test('browser run derives Auth Profile state and leaves the source unchanged', a
       { name: 'storage-derived', passed: true },
       { name: 'page-loaded', passed: true },
       { name: 'takeover-input', passed: true },
+      { name: 'semantic-elements', passed: true },
+      { name: 'semantic-fill-key', passed: true },
+      { name: 'semantic-click', passed: true },
     ]);
     assert.equal(report.auth_profile.unchanged, true);
     assert.equal(report.artifacts.length, 1);
@@ -103,6 +115,13 @@ test('browser run derives Auth Profile state and leaves the source unchanged', a
     const evidence = await readFile(evidencePath, 'utf8');
     assert.doesNotMatch(evidence, /profile-cookie-secret|profile-storage-secret|space-only-cookie|space-only-storage/);
     assert.doesNotMatch(evidence, /human42/);
+    assert.doesNotMatch(evidence, /agent-secret-value/);
+    assert.deepEqual(report.test.actions.map(({ action, status }) => ({ action, status })), [
+      { action: 'snapshot', status: 'started' }, { action: 'snapshot', status: 'passed' },
+      { action: 'fill', status: 'started' }, { action: 'fill', status: 'passed' },
+      { action: 'key', status: 'started' }, { action: 'key', status: 'passed' },
+      { action: 'click', status: 'started' }, { action: 'click', status: 'passed' },
+    ]);
     assert.doesNotMatch(evidence, /127\.0\.0\.1:\d+\/space\//);
   } finally {
     server.close();
