@@ -33,12 +33,19 @@ put passwords, tokens or credential values in the Space name or command argument
 
 ## Browser Space
 
-Run `sigloo browser probe --json` only to verify the current BrowserContext isolation capability. The prototype
-does not yet expose arbitrary website automation through this command. Do not describe the probe as a general
-browser-test runner.
+Run an approved local browser test with an explicit Auth Profile:
+
+```bash
+sigloo browser run --name account-e2e --url https://app.example.test \
+  --script /absolute/path/to/e2e.mjs --auth-profile /private/path/auth-profile.json
+```
+
+Read `docs/reference/AUTH-PROFILE.md` in the installed Sigloo package before creating a profile or test module.
+Use `sigloo browser probe --json` only to diagnose the BrowserContext isolation primitive.
 
 Never read or copy a user's existing browser profile unless a future Sigloo command explicitly requests approval
-for import. Auth Profile state must be explicit, Space-local and non-merging.
+for import. Auth Profile state must be explicit, Space-local and non-merging. Do not print values returned by
+cookie or localStorage getters.
 
 ## Control and visibility
 

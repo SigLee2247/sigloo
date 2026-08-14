@@ -1,15 +1,18 @@
 import { inspectEnvironment } from './doctor.mjs';
 import { runProcessSpace } from './process-space.mjs';
+import { runBrowserTestSpace } from './browser-run.mjs';
 import { runBrowserSpaceSpike } from '../spikes/browser-space/run.mjs';
 
 const HELP = `Usage:
   sigloo doctor [--json]
   sigloo run [--name NAME] [--evidence-dir PATH] -- COMMAND [ARG...]
+  sigloo browser run --url URL --script PATH --auth-profile PATH [options]
   sigloo browser probe [--json]
 
 Commands:
   doctor         Inspect local driver readiness
   run            Run a command in a temporary Process Space
+  browser run    Run a JavaScript test in an isolated Browser Space
   browser probe  Verify BrowserContext isolation with stock Chromium
 `;
 
@@ -40,6 +43,40 @@ function parseRun(arguments_) {
   return { name, evidenceDirectory, command: arguments_[index], args: arguments_.slice(index + 1) };
 }
 
+function parseBrowserRun(arguments_) {
+  const options = {
+    name: 'browser-e2e',
+    evidenceDirectory: '.sigloo/evidence',
+    timeoutMs: 30_000,
+  };
+  for (let index = 0; index < arguments_.length; index += 1) {
+    const token = arguments_[index];
+    if (token === '--json') continue;
+    if (['--name', '--url', '--script', '--auth-profile', '--evidence-dir', '--timeout-ms'].includes(token)) {
+      const value = arguments_[index + 1];
+      if (!value) throw new Error(`${token} requires a value`);
+      if (token === '--name') options.name = value;
+      if (token === '--url') options.url = value;
+      if (token === '--script') options.script = value;
+      if (token === '--auth-profile') options.authProfile = value;
+      if (token === '--evidence-dir') options.evidenceDirectory = value;
+      if (token === '--timeout-ms') {
+        options.timeoutMs = Number(value);
+        if (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1_000 || options.timeoutMs > 300_000) {
+          throw new Error('--timeout-ms must be an integer between 1000 and 300000');
+        }
+      }
+      index += 1;
+      continue;
+    }
+    throw new Error(`Unknown browser run option: ${token}`);
+  }
+  if (!options.url || !options.script || !options.authProfile) {
+    throw new Error('browser run requires --url, --script and --auth-profile');
+  }
+  return options;
+}
+
 export async function runCli(arguments_, {
   output = process.stdout,
   errorOutput = process.stderr,
@@ -64,6 +101,22 @@ export async function runCli(arguments_, {
       const report = await runBrowserSpaceSpike();
       printJson(report, output);
       return report.cleanup.resources_remaining ? 1 : 0;
+    }
+    if (command === 'browser' && rest[0] === 'run') {
+      const options = parseBrowserRun(rest.slice(1));
+      const { report, evidencePath } = await runBrowserTestSpace({
+        ...options,
+        invocationDirectory,
+      });
+      output.write(`SIGLOO_RECEIPT ${JSON.stringify({
+        space_id: report.space_id,
+        status: report.status,
+        evidence: evidencePath,
+        artifacts: report.artifacts.map((artifact) => artifact.path),
+        auth_profile_unchanged: report.auth_profile.unchanged,
+        cleanup: report.cleanup,
+      })}\n`);
+      return report.status === 'passed' ? 0 : 1;
     }
     if (command === 'run') {
       const options = parseRun(rest);

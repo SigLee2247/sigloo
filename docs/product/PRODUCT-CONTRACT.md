@@ -1,6 +1,6 @@
 # Sigloo Product Contract
 
-- Status: approved for technical spike
+- Status: approved for prototype implementation
 - Product: Sigloo
 - CLI: `sigloo`
 - Visual motif: igloo

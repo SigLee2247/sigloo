@@ -1,0 +1,182 @@
+import { randomUUID } from 'node:crypto';
+import { access, lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { basename, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { BrowserSpace } from './browser/browser-space.mjs';
+import { CdpPipe } from './browser/cdp-pipe.mjs';
+import { loadAuthProfile, sha256 } from './browser/auth-profile.mjs';
+
+const DEFAULT_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+
+function createSpaceId(name) {
+  const time = new Date().toISOString().replaceAll(/[-:.TZ]/g, '');
+  return `${name}-${time}-${randomUUID().slice(0, 8)}`;
+}
+
+function validateName(value, label = 'name') {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value)) {
+    throw new Error(`${label} must be 1-64 letters, numbers, dots, underscores or hyphens`);
+  }
+}
+
+async function loadTestModule(path, invocationDirectory) {
+  const absolutePath = resolve(invocationDirectory, path);
+  const metadata = await lstat(absolutePath);
+  if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error('Browser test script must be a regular file');
+  if (metadata.size > 1_048_576) throw new Error('Browser test script must not exceed 1 MiB');
+  const bytes = await readFile(absolutePath);
+  const module = await import(`${pathToFileURL(absolutePath).href}?sigloo=${sha256(bytes)}`);
+  if (typeof module.default !== 'function') throw new Error('Browser test script must export a default function');
+  return { absolutePath, digest: sha256(bytes), run: module.default };
+}
+
+async function withTimeout(operation, timeoutMs) {
+  let timer;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Browser test timed out')), timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function runBrowserTestSpace({
+  name = 'browser-e2e',
+  url,
+  script,
+  authProfile,
+  invocationDirectory = process.cwd(),
+  evidenceDirectory = '.sigloo/evidence',
+  timeoutMs = 30_000,
+  chromePath = process.env.SIGLOO_CHROME_PATH ?? DEFAULT_CHROME,
+} = {}) {
+  validateName(name, 'Space name');
+  if (!url) throw new Error('Browser run requires --url');
+  const parsedUrl = new URL(url);
+  if (!['http:', 'https:'].includes(parsedUrl.protocol) || parsedUrl.username || parsedUrl.password) {
+    throw new Error('Browser run URL must be HTTP(S) without embedded credentials');
+  }
+  const initialUrl = parsedUrl.href;
+  const loadedProfile = await loadAuthProfile(authProfile, invocationDirectory);
+  if (new URL(initialUrl).origin !== loadedProfile.profile.origin) {
+    throw new Error('Initial URL origin must match the Auth Profile origin');
+  }
+  const loadedTest = await loadTestModule(script, invocationDirectory);
+  const id = createSpaceId(name);
+  const startedAt = new Date().toISOString();
+  const temporaryProfile = await mkdtemp(join(tmpdir(), 'sigloo-browser-run-'));
+  const evidenceRoot = resolve(invocationDirectory, evidenceDirectory);
+  const artifactRoot = join(evidenceRoot, `${id}-artifacts`);
+  const evidencePath = join(evidenceRoot, `${id}.json`);
+  const checks = [];
+  const artifacts = [];
+  let cdp;
+  let space;
+  let status = 'failed';
+  let failure = null;
+  let browserExited = true;
+  let temporaryProfileRemoved = false;
+  let authProfileUnchanged = false;
+
+  try {
+    cdp = await CdpPipe.launch(chromePath, [
+      '--headless=new', '--remote-debugging-pipe', `--user-data-dir=${temporaryProfile}`,
+      '--no-first-run', '--no-default-browser-check', '--disable-background-networking',
+      '--disable-component-update', '--disable-sync', 'about:blank',
+    ]);
+    space = await BrowserSpace.create(cdp, initialUrl, loadedProfile.profile);
+    const api = Object.freeze({
+      spaceId: id,
+      goto: (target) => space.goto(target),
+      evaluate: (expression) => space.evaluate(expression),
+      getCookie: (key) => space.getCookie(key),
+      setCookie: (key, value) => space.setCookie(key, value),
+      getLocalStorage: (key) => space.getLocalStorage(key),
+      setLocalStorage: (key, value) => space.setLocalStorage(key, value),
+      assert(assertionName, condition) {
+        validateName(assertionName, 'Assertion name');
+        if (checks.some((check) => check.name === assertionName)) {
+          throw new Error('Assertion names must be unique');
+        }
+        const passed = condition === true;
+        checks.push({ name: assertionName, passed });
+        if (!passed) throw new Error('Named browser assertion failed');
+      },
+      async screenshot(artifactName) {
+        validateName(artifactName, 'Artifact name');
+        if (artifacts.some((artifact) => artifact.name === artifactName)) {
+          throw new Error('Artifact names must be unique');
+        }
+        await mkdir(artifactRoot, { recursive: true });
+        const path = join(artifactRoot, `${artifactName}.png`);
+        await writeFile(path, await space.captureScreenshot(), { mode: 0o600 });
+        artifacts.push({ name: artifactName, path, media_type: 'image/png' });
+        return path;
+      },
+    });
+    await withTimeout(Promise.resolve(loadedTest.run(api)), timeoutMs);
+    status = 'passed';
+  } catch (error) {
+    failure = {
+      type: error?.name ?? 'Error',
+      message_digest: sha256(Buffer.from(String(error?.message ?? 'unknown failure'))),
+    };
+  } finally {
+    if (space) {
+      try { await space.dispose(); } catch { /* Browser.close remains the final boundary. */ }
+    }
+    if (cdp) await cdp.close();
+    browserExited = cdp ? !cdp.isRunning : true;
+    await rm(temporaryProfile, { recursive: true, force: true });
+    try { await access(temporaryProfile); } catch { temporaryProfileRemoved = true; }
+    try {
+      const currentProfile = await readFile(loadedProfile.path);
+      authProfileUnchanged = sha256(currentProfile) === loadedProfile.digest;
+    } catch {
+      authProfileUnchanged = false;
+    }
+  }
+
+  const cleanup = {
+    browser_exited: browserExited,
+    temporary_profile_removed: temporaryProfileRemoved,
+    resources_remaining: !(browserExited && temporaryProfileRemoved),
+  };
+  if (cleanup.resources_remaining || !authProfileUnchanged) {
+    status = 'failed';
+    failure ??= {
+      type: 'InvariantError',
+      message_digest: sha256(Buffer.from('Browser run completion invariant failed')),
+    };
+  }
+  const report = {
+    schema_version: 1,
+    space_id: id,
+    name,
+    driver: 'browser',
+    isolation_level: 'chromium-browser-context',
+    status,
+    started_at: startedAt,
+    finished_at: new Date().toISOString(),
+    browser: { executable: basename(chromePath), headless: true },
+    test: { script_digest: loadedTest.digest, checks },
+    auth_profile: {
+      digest: loadedProfile.digest,
+      origin: loadedProfile.profile.origin,
+      cookie_count: loadedProfile.profile.cookies.length,
+      local_storage_count: Object.keys(loadedProfile.profile.local_storage).length,
+      unchanged: authProfileUnchanged,
+    },
+    artifacts,
+    failure,
+    cleanup,
+  };
+  await mkdir(evidenceRoot, { recursive: true });
+  await writeFile(evidencePath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+  return { report, evidencePath };
+}

@@ -24,9 +24,14 @@ Run the local CLI directly from the repository:
 ```bash
 node bin/sigloo.mjs doctor --json
 node bin/sigloo.mjs run --name smoke -- node /absolute/path/to/smoke-test.mjs
+node bin/sigloo.mjs browser run --url https://app.example.test --script ./e2e.mjs --auth-profile ./auth.json
 node bin/sigloo.mjs browser probe --json
 ```
 
 `sigloo run` currently isolates the child command with a temporary working directory and emits a cleanup receipt
 plus a private evidence file under `.sigloo/evidence`. It is not an OS security sandbox. `browser probe` verifies
-the BrowserContext isolation primitive; arbitrary browser automation and Viewer mode are not exposed yet.
+the BrowserContext isolation primitive independently from a test script.
+
+`browser run` executes a trusted local JavaScript test in a fresh, headless BrowserContext. Its explicit Auth
+Profile is owner-only and remains unchanged. See `docs/reference/AUTH-PROFILE.md` for the v1 format and current
+same-origin boundary. Viewer mode is not exposed yet.

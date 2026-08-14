@@ -29,8 +29,10 @@ export async function runBrowserSpaceSpike({
   let result;
 
   const authProfile = Object.freeze({
+    schema_version: 1,
+    origin,
     cookies: Object.freeze([{ name: 'sigloo_session', value: 'seed-session' }]),
-    localStorage: Object.freeze({ sigloo_auth: 'seed-state' }),
+    local_storage: Object.freeze({ sigloo_auth: 'seed-state' }),
   });
 
   try {
@@ -67,7 +69,7 @@ export async function runBrowserSpaceSpike({
       assert.equal(await space.getLocalStorage('sigloo_auth'), 'seed-state');
     }
     assert.equal(authProfile.cookies[0].value, 'seed-session');
-    assert.equal(authProfile.localStorage.sigloo_auth, 'seed-state');
+    assert.equal(authProfile.local_storage.sigloo_auth, 'seed-state');
 
     result = {
       status: 'passed',
