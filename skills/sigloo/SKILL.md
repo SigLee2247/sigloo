@@ -11,10 +11,10 @@ execution when Sigloo supports the requested surface.
 ## Workflow
 
 1. Run `sigloo doctor --json` and inspect the requested driver's status.
-2. Select the narrowest available driver command.
-3. Run the task with a short, goal-specific Space name.
+2. Create a persistent Space with `sigloo create NAME --ttl 30m --json` when reconnect or multiple drivers are needed.
+3. Select the narrowest available driver command and run it by Space name or ID.
 4. Read the final `SIGLOO_RECEIPT` or JSON report.
-5. Treat `cleanup.resources_remaining: true` as a failed run and report it.
+5. Complete or destroy persistent Spaces explicitly. Treat `cleanup.resources_remaining: true` as a failed run.
 
 ## Process Space
 
@@ -27,6 +27,9 @@ sigloo run --name checkout-e2e -- node /absolute/path/to/smoke-test.mjs
 The command inherits the current environment but receives a new working directory and `SIGLOO_SPACE_ID`,
 `SIGLOO_SPACE_DIR` and `SIGLOO_SPACE_DRIVER`. The prototype does not provide an OS sandbox. Preserve this
 distinction in user-facing claims.
+
+For reconnectable work, use `sigloo run SPACE -- COMMAND` after `sigloo create`. Preserve the returned Space ID,
+not an internal directory path. Do not change `SIGLOO_OWNER_ID` between create, inspect, run and destroy.
 
 Use `--evidence-dir PATH` only when evidence must live outside the default `.sigloo/evidence` directory. Do not
 put passwords, tokens or credential values in the Space name or command arguments.

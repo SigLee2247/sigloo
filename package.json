@@ -10,7 +10,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "check": "node --check bin/sigloo.mjs && node --check src/cli.mjs && node --check src/doctor.mjs && node --check src/process-space.mjs && node --check src/browser-run.mjs && node --check src/browser/auth-profile.mjs && node --check src/browser/browser-space.mjs && node --check src/browser/cdp-pipe.mjs && node --check src/viewer/read-only-viewer.mjs && node --check spikes/browser-space/run.mjs && node --check test/browser-space.test.mjs && node --check test/browser-run.test.mjs && node --check test/read-only-viewer.test.mjs && node --check test/cli.test.mjs",
+    "check": "node --check bin/sigloo.mjs && node --check src/cli.mjs && node --check src/doctor.mjs && node --check src/process-space.mjs && node --check src/space-store.mjs && node --check src/browser-run.mjs && node --check src/browser/auth-profile.mjs && node --check src/browser/browser-space.mjs && node --check src/browser/cdp-pipe.mjs && node --check src/viewer/read-only-viewer.mjs && node --check spikes/browser-space/run.mjs && node --check test/browser-space.test.mjs && node --check test/browser-run.test.mjs && node --check test/read-only-viewer.test.mjs && node --check test/space-store.test.mjs && node --check test/cli.test.mjs",
     "spike:browser": "node spikes/browser-space/run.mjs",
     "test": "node --test"
   }

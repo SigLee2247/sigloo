@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { access, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -31,6 +31,7 @@ test('run creates evidence and removes the Process Space directory', async () =>
     const receipt = JSON.parse(receiptLine.slice('SIGLOO_RECEIPT '.length));
     assert.deepEqual(receipt.cleanup, {
       temporary_directory_removed: true,
+      space_preserved: false,
       resources_remaining: false,
     });
 
@@ -42,6 +43,54 @@ test('run creates evidence and removes the Process Space directory', async () =>
     assert.equal(report.status, 'passed');
     assert.equal(report.isolation_level, 'temporary-working-directory');
     assert.equal(report.cleanup.resources_remaining, false);
+  } finally {
+    await rm(invocationDirectory, { recursive: true, force: true });
+  }
+});
+
+test('persistent Space reconnects across CLI processes and enforces ownership', async () => {
+  const invocationDirectory = await mkdtemp(join(tmpdir(), 'sigloo-space-lifecycle-test-'));
+  const dataRoot = join(invocationDirectory, 'data');
+  const env = { ...process.env, SIGLOO_DATA_ROOT: dataRoot, SIGLOO_OWNER_ID: 'agent-alpha' };
+  try {
+    const created = await execFileAsync(process.execPath, [cli, 'create', 'checkout', '--ttl', '5m', '--json'], { env });
+    const space = JSON.parse(created.stdout);
+    assert.equal(space.name, 'checkout');
+    assert.equal(space.owner_id, 'agent-alpha');
+    assert.equal(space.state, 'ready');
+
+    const run = await execFileAsync(process.execPath, [
+      cli, 'run', space.id, '--', process.execPath, '-e',
+      "process.stdout.write(process.cwd() === process.env.SIGLOO_SPACE_DIR ? 'persistent-ok\\n' : 'wrong-dir\\n')",
+    ], { env });
+    assert.match(run.stdout, /persistent-ok/);
+    const receiptLine = run.stdout.split('\n').find((line) => line.startsWith('SIGLOO_RECEIPT '));
+    const receipt = JSON.parse(receiptLine.slice('SIGLOO_RECEIPT '.length));
+    assert.equal(receipt.cleanup.space_preserved, true);
+    assert.equal(receipt.cleanup.resources_remaining, false);
+
+    const inspected = JSON.parse((await execFileAsync(process.execPath, [cli, 'inspect', space.id, '--json'], { env })).stdout);
+    assert.equal(inspected.id, space.id);
+    assert.equal(inspected.last_run.status, 'passed');
+
+    await assert.rejects(
+      execFileAsync(process.execPath, [cli, 'inspect', space.id, '--json'], {
+        env: { ...env, SIGLOO_OWNER_ID: 'agent-beta' },
+      }),
+      (error) => error.code === 3 && JSON.parse(error.stderr).error.code === 'SPACE_OWNER_MISMATCH',
+    );
+
+    const completed = JSON.parse((await execFileAsync(process.execPath, [cli, 'complete', space.id, '--json'], { env })).stdout);
+    assert.equal(completed.state, 'completed');
+    await assert.rejects(
+      execFileAsync(process.execPath, [cli, 'run', space.id, '--', process.execPath, '-e', 'process.exit(0)'], { env }),
+      (error) => error.code === 5 && /not runnable/.test(error.stderr),
+    );
+
+    const destroyed = JSON.parse((await execFileAsync(process.execPath, [cli, 'destroy', space.id, '--json'], { env })).stdout);
+    assert.equal(destroyed.state, 'destroyed');
+    assert.equal(destroyed.cleanup.resources_remaining, false);
+    await assert.rejects(access(space.work_path));
   } finally {
     await rm(invocationDirectory, { recursive: true, force: true });
   }
