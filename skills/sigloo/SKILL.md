@@ -49,8 +49,11 @@ cookie or localStorage getters.
 
 ## Control and visibility
 
-Assume headless execution unless the user requests visibility. Viewer and takeover are not implemented in this
-prototype; state that limitation instead of opening or controlling the user's normal browser.
+Assume headless execution unless the user requests visibility. Add `--viewer` only on request. Open the temporary
+URL from the `SIGLOO_VIEWER` line for observation; it is loopback-only, read-only and closes with the run. Use
+`--viewer-hold-ms N` only for a bounded final-frame viewing window. Never print or persist the URL in evidence.
+
+Viewer does not provide takeover. Do not click or type through another browser or claim that control transferred.
 
 If the user takes control of a future Viewer, stop agent actions until ownership is explicitly returned.
 
@@ -58,3 +61,4 @@ If the user takes control of a future Viewer, stop agent actions until ownership
 
 Finish only after the command exit status and cleanup receipt agree. Report the Space ID, evidence path, test
 outcome and cleanup status. Never infer success from visible output alone.
+For Viewer runs, also require `viewer.closed: true` and `cleanup.viewer_closed: true`.

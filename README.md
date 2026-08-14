@@ -25,6 +25,7 @@ Run the local CLI directly from the repository:
 node bin/sigloo.mjs doctor --json
 node bin/sigloo.mjs run --name smoke -- node /absolute/path/to/smoke-test.mjs
 node bin/sigloo.mjs browser run --url https://app.example.test --script ./e2e.mjs --auth-profile ./auth.json
+node bin/sigloo.mjs browser run --url https://app.example.test --script ./e2e.mjs --auth-profile ./auth.json --viewer
 node bin/sigloo.mjs browser probe --json
 ```
 
@@ -34,4 +35,5 @@ the BrowserContext isolation primitive independently from a test script.
 
 `browser run` executes a trusted local JavaScript test in a fresh, headless BrowserContext. Its explicit Auth
 Profile is owner-only and remains unchanged. See `docs/reference/AUTH-PROFILE.md` for the v1 format and current
-same-origin boundary. Viewer mode is not exposed yet.
+same-origin boundary. `--viewer` prints a temporary loopback URL that shows the current frame without adding
+click, keyboard or form-control routes. It closes with the run and does not provide takeover.

@@ -47,6 +47,19 @@ test('browser run derives Auth Profile state and leaves the source unchanged', a
       script: scriptPath,
       authProfile: profilePath,
       invocationDirectory,
+      viewer: true,
+      viewerHoldMs: 0,
+      async onViewerReady({ url: viewerUrl, mode, controlOwner }) {
+        assert.equal(mode, 'read-only');
+        assert.equal(controlOwner, 'agent');
+        const page = await fetch(viewerUrl);
+        assert.equal(page.status, 200);
+        assert.match(await page.text(), /Sigloo Viewer/);
+        const frame = await fetch(viewerUrl.replace('/space/', '/frame/'));
+        assert.equal(frame.status, 200);
+        assert.deepEqual([...Buffer.from(await frame.arrayBuffer()).subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+        assert.equal((await fetch(viewerUrl, { method: 'POST' })).status, 405);
+      },
     });
     assert.equal(report.status, 'passed');
     assert.deepEqual(report.test.checks, [
@@ -59,9 +72,20 @@ test('browser run derives Auth Profile state and leaves the source unchanged', a
     const screenshot = await readFile(report.artifacts[0].path);
     assert.deepEqual([...screenshot.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
     assert.equal(report.cleanup.resources_remaining, false);
+    assert.deepEqual(report.viewer, {
+      enabled: true,
+      mode: 'read-only',
+      control_owner: 'agent',
+      page_requests: 1,
+      frame_requests: 1,
+      rejected_mutations: 1,
+      closed: true,
+    });
+    assert.equal(report.cleanup.viewer_closed, true);
     assert.equal(await readFile(profilePath, 'utf8'), profileBytes);
     const evidence = await readFile(evidencePath, 'utf8');
     assert.doesNotMatch(evidence, /profile-cookie-secret|profile-storage-secret|space-only-cookie|space-only-storage/);
+    assert.doesNotMatch(evidence, /127\.0\.0\.1:\d+\/space\//);
   } finally {
     server.close();
     await once(server, 'close');
@@ -94,8 +118,14 @@ test('browser run CLI emits a bounded receipt', async () => {
   try {
     const { stdout } = await execFileAsync(process.execPath, [
       cli, 'browser', 'run', '--name', 'cli-browser-e2e', '--url', `${origin}/`,
-      '--script', scriptPath, '--auth-profile', profilePath,
+      '--script', scriptPath, '--auth-profile', profilePath, '--viewer', '--viewer-hold-ms', '0',
     ], { cwd: invocationDirectory, timeout: 20_000 });
+    const viewerLine = stdout.split('\n').find((line) => line.startsWith('SIGLOO_VIEWER '));
+    assert.ok(viewerLine);
+    const viewer = JSON.parse(viewerLine.slice('SIGLOO_VIEWER '.length));
+    assert.equal(viewer.mode, 'read-only');
+    assert.equal(viewer.control_owner, 'agent');
+    assert.match(viewer.url, /^http:\/\/127\.0\.0\.1:\d+\/space\/[a-f0-9]{48}$/);
     const receiptLine = stdout.split('\n').find((line) => line.startsWith('SIGLOO_RECEIPT '));
     assert.ok(receiptLine);
     const receipt = JSON.parse(receiptLine.slice('SIGLOO_RECEIPT '.length));
@@ -103,6 +133,8 @@ test('browser run CLI emits a bounded receipt', async () => {
     assert.equal(receipt.auth_profile_unchanged, true);
     assert.equal(receipt.cleanup.resources_remaining, false);
     assert.equal(receipt.artifacts.length, 0);
+    assert.equal(receipt.viewer.enabled, true);
+    assert.equal(receipt.viewer.closed, true);
   } finally {
     server.close();
     await once(server, 'close');

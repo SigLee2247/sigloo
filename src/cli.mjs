@@ -6,7 +6,7 @@ import { runBrowserSpaceSpike } from '../spikes/browser-space/run.mjs';
 const HELP = `Usage:
   sigloo doctor [--json]
   sigloo run [--name NAME] [--evidence-dir PATH] -- COMMAND [ARG...]
-  sigloo browser run --url URL --script PATH --auth-profile PATH [options]
+  sigloo browser run --url URL --script PATH --auth-profile PATH [--viewer] [options]
   sigloo browser probe [--json]
 
 Commands:
@@ -48,11 +48,16 @@ function parseBrowserRun(arguments_) {
     name: 'browser-e2e',
     evidenceDirectory: '.sigloo/evidence',
     timeoutMs: 30_000,
+    viewer: false,
   };
   for (let index = 0; index < arguments_.length; index += 1) {
     const token = arguments_[index];
     if (token === '--json') continue;
-    if (['--name', '--url', '--script', '--auth-profile', '--evidence-dir', '--timeout-ms'].includes(token)) {
+    if (token === '--viewer') {
+      options.viewer = true;
+      continue;
+    }
+    if (['--name', '--url', '--script', '--auth-profile', '--evidence-dir', '--timeout-ms', '--viewer-hold-ms'].includes(token)) {
       const value = arguments_[index + 1];
       if (!value) throw new Error(`${token} requires a value`);
       if (token === '--name') options.name = value;
@@ -64,6 +69,13 @@ function parseBrowserRun(arguments_) {
         options.timeoutMs = Number(value);
         if (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1_000 || options.timeoutMs > 300_000) {
           throw new Error('--timeout-ms must be an integer between 1000 and 300000');
+        }
+      }
+      if (token === '--viewer-hold-ms') {
+        options.viewer = true;
+        options.viewerHoldMs = Number(value);
+        if (!Number.isInteger(options.viewerHoldMs) || options.viewerHoldMs < 0 || options.viewerHoldMs > 300_000) {
+          throw new Error('--viewer-hold-ms must be an integer between 0 and 300000');
         }
       }
       index += 1;
@@ -107,6 +119,14 @@ export async function runCli(arguments_, {
       const { report, evidencePath } = await runBrowserTestSpace({
         ...options,
         invocationDirectory,
+        onViewerReady(info) {
+          output.write(`SIGLOO_VIEWER ${JSON.stringify({
+            space_id: info.spaceId,
+            url: info.url,
+            mode: info.mode,
+            control_owner: info.controlOwner,
+          })}\n`);
+        },
       });
       output.write(`SIGLOO_RECEIPT ${JSON.stringify({
         space_id: report.space_id,
@@ -114,6 +134,7 @@ export async function runCli(arguments_, {
         evidence: evidencePath,
         artifacts: report.artifacts.map((artifact) => artifact.path),
         auth_profile_unchanged: report.auth_profile.unchanged,
+        viewer: report.viewer,
         cleanup: report.cleanup,
       })}\n`);
       return report.status === 'passed' ? 0 : 1;

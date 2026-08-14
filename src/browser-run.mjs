@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { BrowserSpace } from './browser/browser-space.mjs';
 import { CdpPipe } from './browser/cdp-pipe.mjs';
 import { loadAuthProfile, sha256 } from './browser/auth-profile.mjs';
+import { ReadOnlyViewer } from './viewer/read-only-viewer.mjs';
 
 const DEFAULT_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
@@ -53,6 +54,9 @@ export async function runBrowserTestSpace({
   invocationDirectory = process.cwd(),
   evidenceDirectory = '.sigloo/evidence',
   timeoutMs = 30_000,
+  viewer = false,
+  viewerHoldMs = viewer ? 3_000 : 0,
+  onViewerReady = () => {},
   chromePath = process.env.SIGLOO_CHROME_PATH ?? DEFAULT_CHROME,
 } = {}) {
   validateName(name, 'Space name');
@@ -67,6 +71,11 @@ export async function runBrowserTestSpace({
     throw new Error('Initial URL origin must match the Auth Profile origin');
   }
   const loadedTest = await loadTestModule(script, invocationDirectory);
+  if (typeof viewer !== 'boolean') throw new Error('Viewer option must be boolean');
+  if (!Number.isInteger(viewerHoldMs) || viewerHoldMs < 0 || viewerHoldMs > 300_000) {
+    throw new Error('Viewer hold must be an integer between 0 and 300000');
+  }
+  if (typeof onViewerReady !== 'function') throw new Error('Viewer ready callback must be a function');
   const id = createSpaceId(name);
   const startedAt = new Date().toISOString();
   const temporaryProfile = await mkdtemp(join(tmpdir(), 'sigloo-browser-run-'));
@@ -77,6 +86,7 @@ export async function runBrowserTestSpace({
   const artifacts = [];
   let cdp;
   let space;
+  let readOnlyViewer;
   let status = 'failed';
   let failure = null;
   let browserExited = true;
@@ -90,6 +100,13 @@ export async function runBrowserTestSpace({
       '--disable-component-update', '--disable-sync', 'about:blank',
     ]);
     space = await BrowserSpace.create(cdp, initialUrl, loadedProfile.profile);
+    if (viewer) {
+      readOnlyViewer = new ReadOnlyViewer({ captureFrame: () => space.captureScreenshot() });
+      const viewerUrl = await readOnlyViewer.start();
+      await onViewerReady({
+        spaceId: id, url: viewerUrl, mode: 'read-only', controlOwner: 'agent',
+      });
+    }
     const api = Object.freeze({
       spaceId: id,
       goto: (target) => space.goto(target),
@@ -127,6 +144,12 @@ export async function runBrowserTestSpace({
       message_digest: sha256(Buffer.from(String(error?.message ?? 'unknown failure'))),
     };
   } finally {
+    if (readOnlyViewer && viewerHoldMs > 0) {
+      await new Promise((resolveHold) => setTimeout(resolveHold, viewerHoldMs));
+    }
+    if (readOnlyViewer) {
+      try { await readOnlyViewer.close(); } catch { /* Cleanup invariant records the failure. */ }
+    }
     if (space) {
       try { await space.dispose(); } catch { /* Browser.close remains the final boundary. */ }
     }
@@ -145,7 +168,8 @@ export async function runBrowserTestSpace({
   const cleanup = {
     browser_exited: browserExited,
     temporary_profile_removed: temporaryProfileRemoved,
-    resources_remaining: !(browserExited && temporaryProfileRemoved),
+    viewer_closed: readOnlyViewer ? readOnlyViewer.closed : true,
+    resources_remaining: !(browserExited && temporaryProfileRemoved && (!readOnlyViewer || readOnlyViewer.closed)),
   };
   if (cleanup.resources_remaining || !authProfileUnchanged) {
     status = 'failed';
@@ -164,6 +188,15 @@ export async function runBrowserTestSpace({
     started_at: startedAt,
     finished_at: new Date().toISOString(),
     browser: { executable: basename(chromePath), headless: true },
+    viewer: readOnlyViewer ? readOnlyViewer.report() : {
+      enabled: false,
+      mode: null,
+      control_owner: null,
+      page_requests: 0,
+      frame_requests: 0,
+      rejected_mutations: 0,
+      closed: true,
+    },
     test: { script_digest: loadedTest.digest, checks },
     auth_profile: {
       digest: loadedProfile.digest,
