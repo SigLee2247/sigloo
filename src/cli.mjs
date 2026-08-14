@@ -3,9 +3,12 @@ import { runProcessSpace } from './process-space.mjs';
 import { runBrowserTestSpace } from './browser-run.mjs';
 import { runBrowserSpaceSpike } from '../spikes/browser-space/run.mjs';
 import { parseTtl, SpaceError, SpaceStore } from './space-store.mjs';
+import { installCodexSkill, setupSigloo } from './setup.mjs';
 
 const HELP = `Usage:
   sigloo doctor [--json]
+  sigloo setup [--json]
+  sigloo agent install codex [--json]
   sigloo create NAME [--ttl 30m] [--json]
   sigloo list [--json]
   sigloo inspect SPACE [--json]
@@ -19,6 +22,8 @@ const HELP = `Usage:
 
 Commands:
   doctor         Inspect local driver readiness
+  setup          Initialize the owner-only local data root
+  agent install  Install a companion Skill for an Agent host
   create         Create a named persistent Space
   list           List Spaces owned by the caller
   inspect        Reconnect to a Space by name or ID
@@ -166,6 +171,23 @@ export async function runCli(arguments_, {
       const report = await inspectEnvironment();
       printJson(report, output);
       return report.status === 'ready' ? 0 : 2;
+    }
+    if (command === 'setup') {
+      const unknown = rest.find((token) => token !== '--json');
+      if (unknown) throw new Error(`Unknown setup option: ${unknown}`);
+      const report = await setupSigloo();
+      if (rest.includes('--json')) printJson(report, output);
+      else output.write(`Sigloo ready at ${report.data_root}\n`);
+      return 0;
+    }
+    if (command === 'agent' && rest[0] === 'install') {
+      if (rest[1] !== 'codex') throw new Error('agent install currently supports codex');
+      const unknown = rest.slice(2).find((token) => token !== '--json');
+      if (unknown) throw new Error(`Unknown agent install option: ${unknown}`);
+      const report = await installCodexSkill();
+      if (rest.includes('--json')) printJson(report, output);
+      else output.write(`Installed $sigloo for Codex at ${report.path}\n`);
+      return 0;
     }
     if (command === 'create') {
       const options = parseCreate(rest);

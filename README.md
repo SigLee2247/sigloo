@@ -15,9 +15,31 @@ ownership, observation, evidence and cleanup consistent across drivers.
 - Viewer: optional and read-only by default
 - MCP: not part of the initial canonical interface
 
-The repository is in its technical-spike phase. No production CLI is published yet.
+The CLI is currently installed from a local checkout. No package is published yet.
 
-## Prototype CLI
+## Local install
+
+Install a content-addressed release and the `sigloo` launcher, then initialize its private data root and companion
+Codex Skill:
+
+```bash
+node scripts/install-local.mjs install
+sigloo setup --json
+sigloo agent install codex --json
+```
+
+The defaults are `~/.local/share/sigloo` for releases and runtime data, `~/.local/bin/sigloo` for the launcher,
+and `~/.codex/skills/sigloo/SKILL.md` for `$sigloo`. Add `~/.local/bin` to `PATH` if needed, and start a new Codex
+session after installing the Skill so discovery is refreshed. Re-running `install` is an atomic, idempotent update.
+The installer refuses to replace launchers it does not own.
+
+To remove only the launcher while retaining releases and user data:
+
+```bash
+node scripts/install-local.mjs uninstall
+```
+
+## CLI
 
 Run the local CLI directly from the repository:
 

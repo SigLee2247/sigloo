@@ -25,6 +25,7 @@
 - 이름·소유자·TTL을 가진 persistent Space registry와 재접속 CLI
 - 기존 E2E 명령을 위한 표준 trace·report·screenshot 경로와 stdout/stderr 증적
 - process lifecycle과 cleanup receipt 실험
+- content-addressed 로컬 CLI 설치·업데이트·제거와 Codex Skill 설치
 - 외부 부작용 없는 로컬 테스트와 증거 작성
 
 ## 현재 금지 범위
@@ -41,5 +42,6 @@
 npm test
 npm run check
 node bin/sigloo.mjs browser probe --json
+node --test test/install.test.mjs
 git diff --check
 ```

@@ -8,6 +8,9 @@ description: Run and verify E2E work in Sigloo's isolated CLI Spaces. Use when a
 Use `sigloo` as the canonical interface. Do not replace its Space lifecycle with direct Playwright, CUA or shell
 execution when Sigloo supports the requested surface.
 
+If `sigloo` is unavailable, report that the local CLI must be installed; do not silently fall back to a different
+isolation model. After installation, run `sigloo setup --json` once before the first Space.
+
 ## Workflow
 
 1. Run `sigloo doctor --json` and inspect the requested driver's status.
