@@ -39,6 +39,7 @@ function viewerHtml(nonce, paths) {
   <header>
     <strong>Sigloo Viewer</strong><span id="badge" class="badge">Read-only · Agent control</span>
     <button id="take">Take control</button><button id="return" hidden>Return to agent</button>
+    ${paths.save ? '<button id="save" hidden>Save login</button>' : ''}
   </header>
   <main><img id="frame" alt="Current Browser Space frame" tabindex="0"></main>
   <script nonce="${nonce}">
@@ -46,6 +47,7 @@ function viewerHtml(nonce, paths) {
     const badge = document.querySelector('#badge');
     const take = document.querySelector('#take');
     const giveBack = document.querySelector('#return');
+    const save = document.querySelector('#save');
     let owner = 'agent';
     const post = (path, body) => fetch(path, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? {})
@@ -55,6 +57,7 @@ function viewerHtml(nonce, paths) {
       document.body.classList.toggle('user-control', user);
       badge.textContent = user ? 'Interactive · User control' : 'Read-only · Agent control';
       take.hidden = user; giveBack.hidden = !user;
+      if (save) save.hidden = !user;
     };
     take.addEventListener('click', async () => {
       const response = await post(${JSON.stringify(paths.takeover)});
@@ -63,6 +66,10 @@ function viewerHtml(nonce, paths) {
     giveBack.addEventListener('click', async () => {
       const response = await post(${JSON.stringify(paths.returnControl)});
       if (response.ok) { owner = 'agent'; renderOwner(); }
+    });
+    if (save) save.addEventListener('click', async () => {
+      const response = await post(${JSON.stringify(paths.save)});
+      if (response.ok) { save.disabled = true; save.textContent = 'Login saved'; }
     });
     frame.addEventListener('pointerdown', (event) => {
       if (owner !== 'user') return;
@@ -99,7 +106,7 @@ async function readJsonBody(request) {
 }
 
 export class BrowserViewer {
-  constructor({ captureFrame, dispatchInput = async () => {} }) {
+  constructor({ captureFrame, dispatchInput = async () => {}, allowSave = false }) {
     if (typeof captureFrame !== 'function') throw new Error('Viewer requires a frame capture function');
     if (typeof dispatchInput !== 'function') throw new Error('Viewer requires an input dispatch function');
     this.captureFrame = captureFrame;
@@ -112,6 +119,7 @@ export class BrowserViewer {
       takeover: `/control/${this.token}/takeover`,
       returnControl: `/control/${this.token}/return`,
       input: `/input/${this.token}`,
+      save: allowSave ? `/control/${this.token}/save` : null,
     };
     this.server = null;
     this.capture = Promise.resolve();
@@ -122,6 +130,8 @@ export class BrowserViewer {
       takeover_count: 0, return_count: 0, input_events: 0,
     };
     this.closed = false;
+    this.saved = false;
+    this.saveWaiters = [];
   }
 
   async start() {
@@ -137,6 +147,12 @@ export class BrowserViewer {
     if (this.closed) return Promise.reject(new Error('Viewer closed before agent control returned'));
     if (this.controlOwner === 'agent') return Promise.resolve();
     return new Promise((resolveWaiter, rejectWaiter) => this.agentWaiters.push({ resolveWaiter, rejectWaiter }));
+  }
+
+  waitForSave() {
+    if (this.saved) return Promise.resolve();
+    if (this.closed) return Promise.reject(new Error('Viewer closed before login was saved'));
+    return new Promise((resolveSave, rejectSave) => this.saveWaiters.push({ resolveSave, rejectSave }));
   }
 
   #setControlOwner(owner) {
@@ -173,6 +189,21 @@ export class BrowserViewer {
         this.metrics.input_events += 1;
         response.writeHead(202, securityHeaders('application/json'));
         response.end(JSON.stringify({ accepted: true }));
+        return;
+      }
+      if (this.paths.save && request.method === 'POST' && pathname === this.paths.save) {
+        if (this.controlOwner !== 'user') {
+          this.metrics.rejected_mutations += 1;
+          response.writeHead(409, securityHeaders('application/json'));
+          response.end(JSON.stringify({ error: 'USER_CONTROL_REQUIRED' }));
+          return;
+        }
+        if (!this.saved) {
+          this.saved = true;
+          this.saveWaiters.splice(0).forEach(({ resolveSave }) => resolveSave());
+        }
+        response.writeHead(200, securityHeaders('application/json'));
+        response.end(JSON.stringify({ saved: true }));
         return;
       }
       this.metrics.rejected_mutations += 1;
@@ -217,6 +248,10 @@ export class BrowserViewer {
       const error = new Error('Viewer closed before user returned control');
       this.agentWaiters.splice(0).forEach(({ rejectWaiter }) => rejectWaiter(error));
     }
+    if (!this.saved) {
+      const error = new Error('Viewer closed before login was saved');
+      this.saveWaiters.splice(0).forEach(({ rejectSave }) => rejectSave(error));
+    }
     const closed = once(this.server, 'close');
     this.server.close();
     this.server.closeIdleConnections?.();
@@ -231,6 +266,7 @@ export class BrowserViewer {
       mode: 'takeover-capable',
       control_owner: this.controlOwner,
       ...this.metrics,
+      ...(this.paths.save ? { login_saved: this.saved } : {}),
       closed: this.closed,
     };
   }

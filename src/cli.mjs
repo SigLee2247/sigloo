@@ -4,11 +4,17 @@ import { runBrowserTestSpace } from './browser-run.mjs';
 import { runBrowserSpaceSpike } from '../spikes/browser-space/run.mjs';
 import { parseTtl, SpaceError, SpaceStore } from './space-store.mjs';
 import { installCodexSkill, setupSigloo } from './setup.mjs';
+import { AuthProfileStore, loginAuthProfile } from './auth-profile-store.mjs';
 
 const HELP = `Usage:
   sigloo doctor [--json]
   sigloo setup [--json]
   sigloo agent install codex [--json]
+  sigloo auth create NAME --origin ORIGIN [--json]
+  sigloo auth list [--json]
+  sigloo auth inspect NAME [--json]
+  sigloo auth select NAME [--json]
+  sigloo auth login NAME [--url URL] [--timeout-ms N] [--json]
   sigloo create NAME [--ttl 30m] [--json]
   sigloo list [--json]
   sigloo inspect SPACE [--json]
@@ -17,13 +23,14 @@ const HELP = `Usage:
   sigloo destroy SPACE [--json]
   sigloo run SPACE -- COMMAND [ARG...]
   sigloo run [--name NAME] [--evidence-dir PATH] -- COMMAND [ARG...]
-  sigloo browser run --url URL --script PATH --auth-profile PATH [--viewer] [options]
+  sigloo browser run --url URL --script PATH [--auth-profile PATH] [--viewer] [options]
   sigloo browser probe [--json]
 
 Commands:
   doctor         Inspect local driver readiness
   setup          Initialize the owner-only local data root
   agent install  Install a companion Skill for an Agent host
+  auth            Create, select and explicitly refresh dedicated Auth Profiles
   create         Create a named persistent Space
   list           List Spaces owned by the caller
   inspect        Reconnect to a Space by name or ID
@@ -146,9 +153,44 @@ function parseBrowserRun(arguments_) {
     }
     throw new Error(`Unknown browser run option: ${token}`);
   }
-  if (!options.url || !options.script || !options.authProfile) {
-    throw new Error('browser run requires --url, --script and --auth-profile');
+  if (!options.url || !options.script) {
+    throw new Error('browser run requires --url and --script');
   }
+  return options;
+}
+
+function parseAuth(command, arguments_) {
+  const options = { json: arguments_.includes('--json') };
+  const positional = [];
+  for (let index = 0; index < arguments_.length; index += 1) {
+    const token = arguments_[index];
+    if (token === '--json') continue;
+    if (['--origin', '--url', '--timeout-ms'].includes(token)) {
+      const value = arguments_[index + 1];
+      if (!value) throw new Error(`${token} requires a value`);
+      if (token === '--origin') options.origin = value;
+      if (token === '--url') options.url = value;
+      if (token === '--timeout-ms') {
+        options.timeoutMs = Number(value);
+        if (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1_000 || options.timeoutMs > 900_000) {
+          throw new Error('--timeout-ms must be an integer between 1000 and 900000');
+        }
+      }
+      index += 1;
+      continue;
+    }
+    if (token.startsWith('-')) throw new Error(`Unknown auth option: ${token}`);
+    positional.push(token);
+  }
+  if (command === 'list') {
+    if (positional.length > 0 || options.origin || options.url || options.timeoutMs) throw new Error('auth list does not accept arguments');
+    return options;
+  }
+  if (positional.length !== 1) throw new Error(`auth ${command} requires one profile name`);
+  options.name = positional[0];
+  if (command === 'create' && !options.origin) throw new Error('auth create requires --origin');
+  if (command !== 'create' && options.origin) throw new Error(`auth ${command} does not accept --origin`);
+  if (command !== 'login' && (options.url || options.timeoutMs)) throw new Error(`auth ${command} does not accept login options`);
   return options;
 }
 
@@ -189,6 +231,28 @@ export async function runCli(arguments_, {
       else output.write(`Installed $sigloo for Codex at ${report.path}\n`);
       return 0;
     }
+    if (command === 'auth') {
+      const authCommand = rest[0];
+      if (!['create', 'list', 'inspect', 'select', 'login'].includes(authCommand)) throw new Error('auth requires create, list, inspect, select or login');
+      const options = parseAuth(authCommand, rest.slice(1));
+      const store = new AuthProfileStore();
+      let result;
+      if (authCommand === 'create') result = await store.create(options.name, options.origin);
+      if (authCommand === 'list') result = await store.list();
+      if (authCommand === 'inspect') result = await store.inspect(options.name);
+      if (authCommand === 'select') result = await store.select(options.name);
+      if (authCommand === 'login') {
+        result = await loginAuthProfile(options.name, {
+          store, url: options.url, timeoutMs: options.timeoutMs,
+          onViewerReady(info) { output.write(`SIGLOO_VIEWER ${JSON.stringify({ profile: info.profile, url: info.url, mode: 'auth-login' })}\n`); },
+        });
+      }
+      if (options.json) printJson(result, output);
+      else if (authCommand === 'select') output.write(`${result.path}\n`);
+      else if (authCommand === 'list') result.forEach((profile) => output.write(`${profile.name}  ${profile.origin}\n`));
+      else output.write(`${authCommand === 'login' ? result.profile.name : result.name}  ${authCommand === 'login' ? result.profile.origin : result.origin}\n`);
+      return 0;
+    }
     if (command === 'create') {
       const options = parseCreate(rest);
       const record = await new SpaceStore().create(options.name, options.ttlMs);
@@ -222,6 +286,7 @@ export async function runCli(arguments_, {
     }
     if (command === 'browser' && rest[0] === 'run') {
       const options = parseBrowserRun(rest.slice(1));
+      if (!options.authProfile) options.authProfile = (await new AuthProfileStore().selected()).path;
       const { report, evidencePath } = await runBrowserTestSpace({
         ...options,
         invocationDirectory,

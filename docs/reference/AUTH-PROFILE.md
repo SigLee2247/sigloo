@@ -32,6 +32,14 @@ encrypted profile storage and profile refresh are not part of v1.
 Never commit a real Auth Profile. Evidence contains only its SHA-256 digest and entry counts, not cookie or
 localStorage values.
 
+## Managed profiles
+
+`sigloo auth create NAME --origin ORIGIN` creates an empty owner-only profile. `auth list` and `auth inspect`
+return metadata only. `auth select NAME` records the default profile for later `browser run` commands.
+`auth login NAME` is the sole v1 refresh path: its temporary Viewer requires user takeover and an explicit
+`Save login` action before Sigloo captures the isolated Context state and atomically replaces the managed file.
+Normal Browser Spaces remain non-merging.
+
 ## Browser test module
 
 Pass an absolute or invocation-directory-relative ECMAScript module of at most 1 MiB to `--script`. It must

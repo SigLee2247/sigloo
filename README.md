@@ -56,6 +56,18 @@ node bin/sigloo.mjs browser run --url https://app.example.test --script ./e2e.mj
 node bin/sigloo.mjs browser probe --json
 ```
 
+Create and select a dedicated Auth Profile once, then refresh it only through an explicit login session:
+
+```bash
+sigloo auth create account --origin https://app.example.test
+sigloo auth select account
+sigloo auth login account --url https://app.example.test/login
+```
+
+`auth login` prints a temporary loopback Viewer. Take control, complete the login, then press `Save login`.
+The profile is stored owner-only and becomes the default for later `browser run` commands when
+`--auth-profile` is omitted. Ordinary Browser Space changes still never merge back.
+
 `sigloo run` currently isolates the child command with a temporary working directory and emits a cleanup receipt
 plus a private evidence file under `.sigloo/evidence`. It is not an OS security sandbox. `browser probe` verifies
 the BrowserContext isolation primitive independently from a test script.

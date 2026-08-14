@@ -44,6 +44,10 @@ put passwords, tokens or credential values in the Space name or command argument
 
 ## Browser Space
 
+Use `sigloo auth list --json` to discover dedicated profiles and `sigloo auth select NAME` to choose the default.
+If no suitable profile exists, create it with a canonical origin. Run `sigloo auth login NAME` only when the user
+can take control of the temporary Viewer and explicitly press `Save login`; never automate that approval action.
+
 Run an approved local browser test with an explicit Auth Profile:
 
 ```bash

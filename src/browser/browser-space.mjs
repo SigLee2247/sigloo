@@ -67,6 +67,26 @@ export class BrowserSpace {
     return this.evaluate(`localStorage.getItem(${JSON.stringify(name)})`);
   }
 
+  async captureAuthProfile() {
+    const { cookies } = await this.cdp.send('Storage.getCookies', {
+      browserContextId: this.browserContextId,
+    });
+    const localStorage = await this.evaluate('Object.fromEntries(Object.entries(localStorage))');
+    return {
+      schema_version: 1,
+      origin: this.origin,
+      cookies: cookies.slice(0, 1_000).map((cookie) => ({
+        name: cookie.name,
+        value: cookie.value,
+        path: cookie.path || '/',
+        secure: Boolean(cookie.secure),
+        httpOnly: Boolean(cookie.httpOnly),
+        sameSite: ['Strict', 'Lax', 'None'].includes(cookie.sameSite) ? cookie.sameSite : 'Lax',
+      })),
+      local_storage: Object.fromEntries(Object.entries(localStorage).slice(0, 1_000)),
+    };
+  }
+
   async evaluate(expression) {
     if (typeof expression !== 'string' || expression.length === 0) {
       throw new Error('Browser evaluation requires a non-empty string');
