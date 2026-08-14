@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { access, lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { access, lstat, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { BrowserSpace } from './browser/browser-space.mjs';
@@ -8,6 +7,7 @@ import { CdpPipe } from './browser/cdp-pipe.mjs';
 import { loadAuthProfile, sha256 } from './browser/auth-profile.mjs';
 import { BrowserViewer } from './viewer/read-only-viewer.mjs';
 import { ResourceSupervisor } from './supervisor/resource-supervisor.mjs';
+import { createManagedTemporaryDirectory } from './supervisor/managed-temporary.mjs';
 
 const DEFAULT_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
@@ -79,7 +79,7 @@ export async function runBrowserTestSpace({
   if (typeof onViewerReady !== 'function') throw new Error('Viewer ready callback must be a function');
   const id = createSpaceId(name);
   const startedAt = new Date().toISOString();
-  const temporaryProfile = await mkdtemp(join(tmpdir(), 'sigloo-browser-run-'));
+  const temporaryProfile = await createManagedTemporaryDirectory('sigloo-browser-run-');
   const supervisor = new ResourceSupervisor();
   supervisor.register('temporary-profile', () => rm(temporaryProfile, { recursive: true, force: true }));
   const evidenceRoot = resolve(invocationDirectory, evidenceDirectory);

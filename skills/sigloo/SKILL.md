@@ -19,6 +19,9 @@ isolation model. After installation, run `sigloo setup --json` once before the f
 4. Read the final `SIGLOO_RECEIPT` or JSON report.
 5. Complete or destroy persistent Spaces explicitly. Treat `cleanup.resources_remaining: true` as a failed run.
 
+After a previous Sigloo process was killed or the host restarted, run `sigloo setup --json` and require
+`recovery.resources_remaining: false` before starting new Browser Spaces.
+
 ## Process Space
 
 Run a command in a temporary working directory:
@@ -27,9 +30,9 @@ Run a command in a temporary working directory:
 sigloo run --name checkout-e2e -- node /absolute/path/to/smoke-test.mjs
 ```
 
-The command inherits the current environment but receives a new working directory and `SIGLOO_SPACE_ID`,
-`SIGLOO_SPACE_DIR` and `SIGLOO_SPACE_DRIVER`. The prototype does not provide an OS sandbox. Preserve this
-distinction in user-facing claims.
+The command preserves the current project working directory so the existing suite runs unchanged. It receives
+`SIGLOO_SPACE_ID`, a separate scratch `SIGLOO_SPACE_DIR`, and `SIGLOO_SPACE_DRIVER`. The prototype does not
+provide an OS sandbox or prevent project writes. Preserve this distinction in user-facing claims.
 
 For reconnectable work, use `sigloo run SPACE -- COMMAND` after `sigloo create`. Preserve the returned Space ID,
 not an internal directory path. Do not change `SIGLOO_OWNER_ID` between create, inspect, run and destroy.

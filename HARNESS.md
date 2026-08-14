@@ -28,6 +28,7 @@
 - content-addressed 로컬 CLI 설치·업데이트·제거와 Codex Skill 설치
 - 요소 참조 기반 Browser Actions와 역순 cleanup Supervisor receipt
 - owner-only Auth Profile create/list/inspect/select와 명시적 Viewer login 저장
+- Chrome parent-death watchdog, marked temp-profile recovery와 반복·동시성 release gate
 - 외부 부작용 없는 로컬 테스트와 증거 작성
 
 ## 현재 금지 범위

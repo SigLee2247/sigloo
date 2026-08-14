@@ -1,6 +1,6 @@
 # Sigloo Product Contract
 
-- Status: approved for prototype implementation
+- Status: MVP implementation complete
 - Product: Sigloo
 - CLI: `sigloo`
 - Visual motif: igloo

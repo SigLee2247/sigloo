@@ -33,6 +33,9 @@ and `~/.codex/skills/sigloo/SKILL.md` for `$sigloo`. Add `~/.local/bin` to `PATH
 session after installing the Skill so discovery is refreshed. Re-running `install` is an atomic, idempotent update.
 The installer refuses to replace launchers it does not own.
 
+`sigloo setup` also recovers marked Browser profiles left by a terminated Sigloo process. Chrome is launched
+through a watchdog whose parent pipe closes on a crash, preventing the tested parent-termination orphan case.
+
 To remove only the launcher while retaining releases and user data:
 
 ```bash
@@ -68,8 +71,9 @@ sigloo auth login account --url https://app.example.test/login
 The profile is stored owner-only and becomes the default for later `browser run` commands when
 `--auth-profile` is omitted. Ordinary Browser Space changes still never merge back.
 
-`sigloo run` currently isolates the child command with a temporary working directory and emits a cleanup receipt
-plus a private evidence file under `.sigloo/evidence`. It is not an OS security sandbox. `browser probe` verifies
+`sigloo run` preserves the caller's project working directory so existing suites run unchanged, while assigning a
+separate scratch directory and artifact paths. It emits a cleanup receipt plus private evidence under
+`.sigloo/evidence`. It is not an OS security sandbox and does not prevent project writes. `browser probe` verifies
 the BrowserContext isolation primitive independently from a test script.
 
 `sigloo create` makes a named Space with a stable ID and bounded TTL. A later CLI process can `inspect` or

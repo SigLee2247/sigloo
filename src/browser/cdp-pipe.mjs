@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const MESSAGE_SEPARATOR = 0;
 
@@ -12,8 +13,9 @@ export class CdpPipe {
   #stderr = '';
 
   static async launch(executable, args) {
-    const child = spawn(executable, args, {
-      stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'],
+    const supervisor = fileURLToPath(new URL('../../scripts/chrome-supervisor.mjs', import.meta.url));
+    const child = spawn(process.execPath, [supervisor, executable, ...args], {
+      stdio: ['pipe', 'ignore', 'pipe', 'pipe', 'pipe'],
     });
     const client = new CdpPipe(child);
     await client.send('Browser.getVersion');
@@ -75,6 +77,7 @@ export class CdpPipe {
       this.#child.kill('SIGKILL');
       await exited;
     }
+    this.#child.stdin.destroy();
   }
 
   get pid() {

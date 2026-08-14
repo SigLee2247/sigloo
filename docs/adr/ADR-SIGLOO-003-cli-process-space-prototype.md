@@ -1,6 +1,6 @@
 # ADR-SIGLOO-003 CLI-first prototype boundary and Process Space evidence
 
-- Status: accepted
+- Status: superseded by ADR-SIGLOO-012
 - Date: 2026-08-13
 
 ## Context

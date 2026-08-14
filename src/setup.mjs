@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inspectEnvironment } from './doctor.mjs';
 import { SpaceStore } from './space-store.mjs';
+import { recoverManagedTemporaryDirectories } from './supervisor/managed-temporary.mjs';
 
 function digest(bytes) {
   return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
@@ -14,11 +15,13 @@ export async function setupSigloo() {
   const store = new SpaceStore();
   await store.initialize();
   const environment = await inspectEnvironment();
+  const recovery = await recoverManagedTemporaryDirectories();
   return {
     status: 'ready',
     data_root: store.dataRoot,
     drivers: environment.drivers,
     chrome: environment.chrome,
+    recovery,
   };
 }
 

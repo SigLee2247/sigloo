@@ -78,6 +78,7 @@ export async function runProcessSpace({
   // macOS may expose /var through the /private/var symlink. Canonicalizing keeps
   // cwd and SIGLOO_SPACE_DIR identical for child processes and reconnects.
   const directory = await realpath(requestedDirectory);
+  const commandDirectory = await realpath(invocationDirectory);
   const evidenceRoot = persistentSpace?.directories.evidence ?? resolve(invocationDirectory, evidenceDirectory);
   const artifactRoot = persistentSpace?.directories.artifacts ?? join(evidenceRoot, `${id}-artifacts`);
   const artifactDirectories = {
@@ -96,7 +97,7 @@ export async function runProcessSpace({
 
   try {
     execution = await waitForChild(command, args, {
-      cwd: directory,
+      cwd: commandDirectory,
       env: {
         ...process.env,
         SIGLOO_SPACE_ID: id,
@@ -129,7 +130,7 @@ export async function runProcessSpace({
     space_id: id,
     name,
     driver: 'process',
-    isolation_level: persistentSpace ? 'persistent-space-directory' : 'temporary-working-directory',
+    isolation_level: 'process-environment-and-space-artifacts',
     status: succeeded ? 'passed' : 'failed',
     started_at: startedAt,
     finished_at: finishedAt,

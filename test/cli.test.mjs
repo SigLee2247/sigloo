@@ -44,7 +44,7 @@ test('run creates evidence and removes the Process Space directory', async () =>
     const report = JSON.parse(await readFile(join(evidenceDirectory, evidenceFiles[0]), 'utf8'));
     assert.equal(report.space_id, receipt.space_id);
     assert.equal(report.status, 'passed');
-    assert.equal(report.isolation_level, 'temporary-working-directory');
+    assert.equal(report.isolation_level, 'process-environment-and-space-artifacts');
     assert.equal(report.cleanup.resources_remaining, false);
     assert.deepEqual(report.artifacts.items.map((artifact) => artifact.kind), ['logs', 'logs']);
     assert.match(await readFile(report.artifacts.items.find((artifact) => artifact.path.endsWith('stdout.log')).path, 'utf8'), /child-ok/);
@@ -66,7 +66,7 @@ test('persistent Space reconnects across CLI processes and enforces ownership', 
 
     const run = await execFileAsync(process.execPath, [
       cli, 'run', space.id, '--', process.execPath, '-e',
-      "const fs=require('node:fs'); const required=['SIGLOO_ARTIFACT_DIR','SIGLOO_LOG_DIR','SIGLOO_TRACE_DIR','SIGLOO_REPORT_DIR','SIGLOO_SCREENSHOT_DIR']; if(required.some((key)=>!process.env[key])) process.exit(9); fs.writeFileSync(process.env.SIGLOO_TRACE_DIR + '/trace.zip', 'trace'); fs.writeFileSync(process.env.SIGLOO_REPORT_DIR + '/report.json', '{}'); fs.writeFileSync(process.env.SIGLOO_SCREENSHOT_DIR + '/final.png', 'png'); process.stdout.write(process.cwd() === process.env.SIGLOO_SPACE_DIR ? 'persistent-ok\\n' : 'wrong-dir\\n'); process.stderr.write('persistent-err\\n')",
+      "const fs=require('node:fs'); const required=['SIGLOO_ARTIFACT_DIR','SIGLOO_LOG_DIR','SIGLOO_TRACE_DIR','SIGLOO_REPORT_DIR','SIGLOO_SCREENSHOT_DIR']; if(required.some((key)=>!process.env[key])) process.exit(9); fs.writeFileSync(process.env.SIGLOO_TRACE_DIR + '/trace.zip', 'trace'); fs.writeFileSync(process.env.SIGLOO_REPORT_DIR + '/report.json', '{}'); fs.writeFileSync(process.env.SIGLOO_SCREENSHOT_DIR + '/final.png', 'png'); process.stdout.write(process.cwd() !== process.env.SIGLOO_SPACE_DIR ? 'persistent-ok\\n' : 'wrong-dir\\n'); process.stderr.write('persistent-err\\n')",
     ], { env });
     assert.match(run.stdout, /persistent-ok/);
     const receiptLine = run.stdout.split('\n').find((line) => line.startsWith('SIGLOO_RECEIPT '));

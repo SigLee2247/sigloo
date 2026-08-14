@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { chmod, link, mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
-import { homedir, tmpdir } from 'node:os';
+import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { rm } from 'node:fs/promises';
 import { loadAuthProfile } from './browser/auth-profile.mjs';
 import { BrowserSpace } from './browser/browser-space.mjs';
 import { CdpPipe } from './browser/cdp-pipe.mjs';
 import { ResourceSupervisor } from './supervisor/resource-supervisor.mjs';
 import { BrowserViewer } from './viewer/read-only-viewer.mjs';
+import { createManagedTemporaryDirectory } from './supervisor/managed-temporary.mjs';
 
 const DEFAULT_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
@@ -118,7 +119,7 @@ export async function loginAuthProfile(name, {
   const target = new URL(url ?? selected.origin);
   if (target.origin !== selected.origin || !['http:', 'https:'].includes(target.protocol)) throw new Error('Login URL must match the Auth Profile origin');
   const loaded = await loadAuthProfile(selected.path);
-  const temporaryProfile = await mkdtemp(join(tmpdir(), 'sigloo-auth-login-'));
+  const temporaryProfile = await createManagedTemporaryDirectory('sigloo-auth-login-');
   const supervisor = new ResourceSupervisor();
   supervisor.register('temporary-profile', () => rm(temporaryProfile, { recursive: true, force: true }));
   let viewer;
