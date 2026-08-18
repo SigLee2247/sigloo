@@ -115,7 +115,7 @@ export async function runDesktopSpace({
   try {
     const childPromise = runChild(electronPath, [`--remote-debugging-port=${remoteDebuggingPort}`, appPath, ...args], {
       cwd: resolve(invocationDirectory),
-      env: { ...process.env, SIGLOO_SPACE_ID: id, SIGLOO_SPACE_DRIVER: 'desktop', SIGLOO_DESKTOP_USER_DATA_DIR: userData, SIGLOO_ARTIFACT_DIR: artifactRoot },
+      env: { ...process.env, SIGLOO_SPACE_ID: id, SIGLOO_SPACE_DRIVER: 'desktop', SIGLOO_DESKTOP_MODE: 'offscreen', SIGLOO_DESKTOP_USER_DATA_DIR: userData, SIGLOO_ARTIFACT_DIR: artifactRoot },
       stdio: ['ignore', 'pipe', 'pipe'],
     }, stdoutPath, stderrPath, timeoutMs, (child) => { childProcess = child; });
     renderer = await inspectRenderer(remoteDebuggingPort, Math.min(timeoutMs, 5_000));
