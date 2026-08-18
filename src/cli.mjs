@@ -27,7 +27,7 @@ const HELP = `Usage:
   sigloo run [--name NAME] [--evidence-dir PATH] -- COMMAND [ARG...]
   sigloo browser run --url URL --script PATH [--auth-profile PATH] [--viewer] [options]
   sigloo browser probe [--json]
-  sigloo desktop run --app PATH --electron-path PATH [--timeout-ms N] [-- ARG...]
+  sigloo desktop run --app PATH --electron-path PATH [--script PATH] [--timeout-ms N] [-- ARG...]
 
 Commands:
   doctor         Inspect local driver readiness
@@ -171,12 +171,13 @@ function parseDesktopRun(arguments_) {
   for (let index = 0; index < separator; index += 1) {
     const token = arguments_[index];
     if (token === '--json') continue;
-    if (['--name', '--app', '--electron-path', '--evidence-dir', '--timeout-ms'].includes(token)) {
+    if (['--name', '--app', '--electron-path', '--script', '--evidence-dir', '--timeout-ms'].includes(token)) {
       const value = arguments_[index + 1];
       if (!value) throw new Error(`${token} requires a value`);
       if (token === '--name') options.name = value;
       if (token === '--app') options.app = value;
       if (token === '--electron-path') options.electronPath = value;
+      if (token === '--script') options.script = value;
       if (token === '--evidence-dir') options.evidenceDirectory = value;
       if (token === '--timeout-ms') options.timeoutMs = Number(value);
       index += 1;

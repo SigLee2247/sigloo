@@ -105,4 +105,6 @@ reports both individual resource results and the final `resources_remaining` inv
 
 `sigloo desktop run` launches an Electron executable with a fresh temporary `userData` directory, bounded
 environment variables and private stdout/stderr evidence. The app path is passed as the first Electron argument;
-additional app arguments follow `--`. This is an experimental Desktop Space, not an OS sandbox.
+additional app arguments follow `--`. With `--script`, a local module can inspect `windows()`, evaluate bounded
+renderer expressions, assert named conditions and capture screenshots. This is an experimental Desktop Space, not
+an OS sandbox.
