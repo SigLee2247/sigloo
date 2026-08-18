@@ -13,7 +13,7 @@ competing with the user's active tabs, application data, focus, keyboard input s
 
 ## MVP
 
-- Browser and Process Space
+- Browser, Process and experimental Desktop Space
 - Space ownership, TTL, reconnect and deterministic cleanup
 - BrowserContext and storage isolation
 - dedicated Auth Profile with per-Space derived state

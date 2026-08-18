@@ -28,7 +28,7 @@ export async function inspectEnvironment({
     drivers: {
       process: 'prototype',
       browser: chromeAvailable ? 'experimental' : 'unavailable',
-      desktop: 'not-implemented',
+      desktop: 'experimental',
     },
   };
 }

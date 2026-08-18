@@ -10,6 +10,7 @@ package release.
 - isolated Browser Space with bounded actions and optional Viewer takeover
 - managed Auth Profiles with explicit login capture
 - named Process Spaces with evidence and deterministic cleanup
+- experimental Desktop Space for Electron-style launchers with isolated `userData`
 - crash-safe Chrome supervision and temporary-profile recovery
 - local installer and companion `$sigloo` Skill
 

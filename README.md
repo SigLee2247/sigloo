@@ -59,6 +59,7 @@ node bin/sigloo.mjs run --name smoke -- node /absolute/path/to/smoke-test.mjs
 node bin/sigloo.mjs browser run --url https://app.example.test --script ./e2e.mjs --auth-profile ./auth.json
 node bin/sigloo.mjs browser run --url https://app.example.test --script ./e2e.mjs --auth-profile ./auth.json --viewer
 node bin/sigloo.mjs browser probe --json
+node bin/sigloo.mjs desktop run --app ./my-electron-app --electron-path /path/to/electron
 ```
 
 Create and select a dedicated Auth Profile once, then refresh it only through an explicit login session:
@@ -101,3 +102,7 @@ Browser test modules can use `snapshot()` to receive bounded, Space-local elemen
 `click(ref)`, `fill(ref, text)` or `key(ref, key)`. Fill text and key values are excluded from action evidence.
 Every browser resource is registered with the run Supervisor and closed in reverse dependency order; cleanup
 reports both individual resource results and the final `resources_remaining` invariant.
+
+`sigloo desktop run` launches an Electron executable with a fresh temporary `userData` directory, bounded
+environment variables and private stdout/stderr evidence. The app path is passed as the first Electron argument;
+additional app arguments follow `--`. This is an experimental Desktop Space, not an OS sandbox.

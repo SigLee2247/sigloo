@@ -6,6 +6,7 @@ import { parseTtl, SpaceError, SpaceStore } from './space-store.mjs';
 import { installCodexSkill, setupSigloo } from './setup.mjs';
 import { AuthProfileStore, loginAuthProfile } from './auth-profile-store.mjs';
 import { SIGLOO_VERSION } from './version.mjs';
+import { runDesktopSpace } from './desktop-space.mjs';
 
 const HELP = `Usage:
   sigloo doctor [--json]
@@ -26,6 +27,7 @@ const HELP = `Usage:
   sigloo run [--name NAME] [--evidence-dir PATH] -- COMMAND [ARG...]
   sigloo browser run --url URL --script PATH [--auth-profile PATH] [--viewer] [options]
   sigloo browser probe [--json]
+  sigloo desktop run --app PATH --electron-path PATH [--timeout-ms N] [-- ARG...]
 
 Commands:
   doctor         Inspect local driver readiness
@@ -41,6 +43,7 @@ Commands:
   run            Run a command in a temporary Process Space
   browser run    Run a JavaScript test in an isolated Browser Space
   browser probe  Verify BrowserContext isolation with stock Chromium
+  desktop run    Run an Electron app with isolated user data and bounded evidence
 `;
 
 function printJson(value, output) {
@@ -157,6 +160,33 @@ function parseBrowserRun(arguments_) {
   if (!options.url || !options.script) {
     throw new Error('browser run requires --url and --script');
   }
+  return options;
+}
+
+function parseDesktopRun(arguments_) {
+  const options = { args: [], timeoutMs: 30_000 };
+  let separator = arguments_.indexOf('--');
+  if (separator < 0) separator = arguments_.length;
+  options.args = arguments_.slice(separator + 1);
+  for (let index = 0; index < separator; index += 1) {
+    const token = arguments_[index];
+    if (token === '--json') continue;
+    if (['--name', '--app', '--electron-path', '--evidence-dir', '--timeout-ms'].includes(token)) {
+      const value = arguments_[index + 1];
+      if (!value) throw new Error(`${token} requires a value`);
+      if (token === '--name') options.name = value;
+      if (token === '--app') options.app = value;
+      if (token === '--electron-path') options.electronPath = value;
+      if (token === '--evidence-dir') options.evidenceDirectory = value;
+      if (token === '--timeout-ms') options.timeoutMs = Number(value);
+      index += 1;
+      continue;
+    }
+    throw new Error(`Unknown desktop run option: ${token}`);
+  }
+  if (!options.app) throw new Error('desktop run requires --app');
+  if (!options.electronPath) throw new Error('desktop run requires --electron-path');
+  if (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1_000 || options.timeoutMs > 300_000) throw new Error('--timeout-ms must be an integer between 1000 and 300000');
   return options;
 }
 
@@ -309,6 +339,12 @@ export async function runCli(arguments_, {
         viewer: report.viewer,
         cleanup: report.cleanup,
       })}\n`);
+      return report.status === 'passed' ? 0 : 1;
+    }
+    if (command === 'desktop' && rest[0] === 'run') {
+      const options = parseDesktopRun(rest.slice(1));
+      const { report, evidencePath } = await runDesktopSpace({ ...options, invocationDirectory });
+      output.write(`SIGLOO_RECEIPT ${JSON.stringify({ space_id: report.space_id, status: report.status, evidence: evidencePath, artifacts: report.artifacts.items.map((artifact) => artifact.path), cleanup: report.cleanup })}\n`);
       return report.status === 'passed' ? 0 : 1;
     }
     if (command === 'run') {
