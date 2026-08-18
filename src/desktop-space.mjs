@@ -135,7 +135,7 @@ export async function runDesktopSpace({
         evaluate: async (expression) => {
           if (typeof expression !== 'string' || expression.length > 50_000) throw new Error('Desktop evaluate expression is invalid');
           actions.push({ action: 'evaluate', at: new Date().toISOString() });
-          return (await cdpCall(target, 'Runtime.evaluate', { expression, returnByValue: true })).result?.value ?? null;
+          return (await cdpCall(target, 'Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })).result?.value ?? null;
         },
         click: async (selector) => {
           if (typeof selector !== 'string' || selector.length > 1_000) throw new Error('Desktop selector is invalid');

@@ -36,6 +36,10 @@ await writeFile(script, `export default async function (desktop) {
     await new Promise((resolve) => setTimeout(resolve, 500));
     desktop.assert('terminal-output', (await desktop.evaluate('document.querySelector(".xterm-rows")?.innerText ?? ""')).includes('SIGLOO_GATE'));
   }
+  if (process.env.SIGLOO_DESKTOP_IPC === '1') {
+    const fontSize = await desktop.evaluate('window.sigterm.invoke("config:get", { key: "terminal.fontSize", fallback: 13 })');
+    desktop.assert('config-ipc', typeof fontSize === 'number');
+  }
   await desktop.screenshot('initial');
   desktop.close();
 }\n`);
