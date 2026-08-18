@@ -120,12 +120,18 @@ export async function runDesktopSpace({
     }, stdoutPath, stderrPath, timeoutMs, (child) => { childProcess = child; });
     renderer = await inspectRenderer(remoteDebuggingPort, Math.min(timeoutMs, 5_000));
     if (script) {
-      const target = renderer.targets.find((item) => item.type === 'page' && item.webSocketDebuggerUrl);
+      let target = renderer.targets.find((item) => item.type === 'page' && item.webSocketDebuggerUrl);
       if (!target) throw new Error('Desktop renderer target was not found');
       const runScript = await loadDesktopScript(script, invocationDirectory);
       const api = Object.freeze({
         spaceId: id,
         windows: () => renderer.targets.map((item) => ({ id: item.id, type: item.type, url: item.url, title: item.title })),
+        useWindow: (windowId) => {
+          const selected = renderer.targets.find((item) => item.id === windowId && item.webSocketDebuggerUrl);
+          if (!selected) throw new Error('Desktop window target was not found');
+          target = selected;
+          actions.push({ action: 'useWindow', target: windowId, at: new Date().toISOString() });
+        },
         evaluate: async (expression) => {
           if (typeof expression !== 'string' || expression.length > 50_000) throw new Error('Desktop evaluate expression is invalid');
           actions.push({ action: 'evaluate', at: new Date().toISOString() });
