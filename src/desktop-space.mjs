@@ -15,9 +15,10 @@ function validateName(value) {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value)) throw new Error('Space name must be 1-64 letters, numbers, dots, underscores or hyphens');
 }
 
-async function runChild(executable, args, options, stdoutPath, stderrPath, timeoutMs) {
+async function runChild(executable, args, options, stdoutPath, stderrPath, timeoutMs, onSpawn = () => {}) {
   const stdout = [], stderr = [];
   const child = spawn(executable, args, options);
+  onSpawn(child);
   child.stdout.on('data', (chunk) => stdout.push(chunk));
   child.stderr.on('data', (chunk) => stderr.push(chunk));
   let timedOut = false;
@@ -109,13 +110,14 @@ export async function runDesktopSpace({
   const actions = [];
   const artifacts = [];
   let scriptFailure = null;
+  let childProcess = null;
   let userDataRemoved = false;
   try {
     const childPromise = runChild(electronPath, [`--remote-debugging-port=${remoteDebuggingPort}`, appPath, ...args], {
       cwd: resolve(invocationDirectory),
       env: { ...process.env, SIGLOO_SPACE_ID: id, SIGLOO_SPACE_DRIVER: 'desktop', SIGLOO_DESKTOP_USER_DATA_DIR: userData, SIGLOO_ARTIFACT_DIR: artifactRoot },
       stdio: ['ignore', 'pipe', 'pipe'],
-    }, stdoutPath, stderrPath, timeoutMs);
+    }, stdoutPath, stderrPath, timeoutMs, (child) => { childProcess = child; });
     renderer = await inspectRenderer(remoteDebuggingPort, Math.min(timeoutMs, 1_000));
     if (script) {
       const target = renderer.targets.find((item) => item.type === 'page' && item.webSocketDebuggerUrl);
@@ -129,6 +131,18 @@ export async function runDesktopSpace({
           actions.push({ action: 'evaluate', at: new Date().toISOString() });
           return (await cdpCall(target, 'Runtime.evaluate', { expression, returnByValue: true })).result?.value ?? null;
         },
+        click: async (selector) => {
+          if (typeof selector !== 'string' || selector.length > 1_000) throw new Error('Desktop selector is invalid');
+          actions.push({ action: 'click', target: selector, at: new Date().toISOString() });
+          return (await cdpCall(target, 'Runtime.evaluate', { expression: `(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!element) throw new Error('Desktop element not found'); element.click(); return true; })()`, returnByValue: true })).result?.value ?? false;
+        },
+        fill: async (selector, value) => {
+          if (typeof selector !== 'string' || selector.length > 1_000 || typeof value !== 'string' || value.length > 100_000) throw new Error('Desktop fill input is invalid');
+          actions.push({ action: 'fill', target: selector, at: new Date().toISOString() });
+          const expression = `(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!element) throw new Error('Desktop element not found'); element.focus(); element.value = ${JSON.stringify(value)}; element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`;
+          return (await cdpCall(target, 'Runtime.evaluate', { expression, returnByValue: true })).result?.value ?? false;
+        },
+        close: () => { actions.push({ action: 'close', at: new Date().toISOString() }); childProcess?.kill('SIGTERM'); },
         assert(assertionName, condition) {
           validateName(assertionName, 'Assertion name');
           const passed = condition === true; assertions.push({ name: assertionName, passed });
