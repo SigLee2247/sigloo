@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
+import { randomInt } from 'node:crypto';
 
 function createSpaceId(name) {
   const time = new Date().toISOString().replaceAll(/[-:.TZ]/g, '');
@@ -30,6 +31,33 @@ async function runChild(executable, args, options, stdoutPath, stderrPath, timeo
   return { ...result, timedOut };
 }
 
+async function inspectRenderer(port, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let targets = [];
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/json/list`);
+      targets = await response.json();
+      const page = targets.find((target) => target.type === 'page' && target.webSocketDebuggerUrl);
+      if (page) {
+        const socket = new WebSocket(page.webSocketDebuggerUrl);
+        const result = await new Promise((resolveResult, reject) => {
+          const timer = setTimeout(() => reject(new Error('Renderer inspection timed out')), 3_000);
+          socket.addEventListener('open', () => socket.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression: 'document.title' } })));
+          socket.addEventListener('message', (event) => {
+            const message = JSON.parse(event.data);
+            if (message.id === 1) { clearTimeout(timer); resolveResult(message.result?.result?.value ?? null); socket.close(); }
+          });
+          socket.addEventListener('error', reject);
+        });
+        return { targets, page_url: page.url, title: result };
+      }
+    } catch { /* app is still starting */ }
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+  }
+  return { targets, page_url: null, title: null };
+}
+
 export async function runDesktopSpace({
   name = 'desktop-e2e', app, electronPath = process.env.SIGLOO_ELECTRON_PATH,
   args = [], invocationDirectory = process.cwd(), evidenceDirectory = '.sigloo/evidence', timeoutMs = 30_000,
@@ -50,13 +78,17 @@ export async function runDesktopSpace({
   const stderrPath = join(logs, 'stderr.log');
   const evidencePath = join(evidenceRoot, `${id}.json`);
   let execution;
+  const remoteDebuggingPort = randomInt(40_000, 49_000);
+  let renderer = { targets: [], page_url: null, title: null };
   let userDataRemoved = false;
   try {
-    execution = await runChild(electronPath, [appPath, ...args], {
+    const childPromise = runChild(electronPath, [`--remote-debugging-port=${remoteDebuggingPort}`, appPath, ...args], {
       cwd: resolve(invocationDirectory),
       env: { ...process.env, SIGLOO_SPACE_ID: id, SIGLOO_SPACE_DRIVER: 'desktop', SIGLOO_DESKTOP_USER_DATA_DIR: userData, SIGLOO_ARTIFACT_DIR: artifactRoot },
       stdio: ['ignore', 'pipe', 'pipe'],
     }, stdoutPath, stderrPath, timeoutMs);
+    renderer = await inspectRenderer(remoteDebuggingPort, Math.min(timeoutMs, 1_000));
+    execution = await childPromise;
   } finally {
     await rm(userData, { recursive: true, force: true });
     try { await access(userData); } catch { userDataRemoved = true; }
@@ -65,7 +97,7 @@ export async function runDesktopSpace({
   const report = {
     schema_version: 1, space_id: id, name, driver: 'desktop', isolation_level: 'electron-user-data-and-space-artifacts',
     status: passed ? 'passed' : 'failed', started_at: startedAt, finished_at: new Date().toISOString(),
-    desktop: { executable: basename(electronPath), app: appPath },
+    desktop: { executable: basename(electronPath), app: appPath, remote_debugging_port: remoteDebuggingPort, renderer },
     result: { exit_code: execution.exitCode, signal: execution.signal, timed_out: execution.timedOut, spawn_error: execution.error?.code ?? null },
     failure: passed ? null : { step: 'desktop-process', category: execution.error || execution.timedOut ? 'driver' : 'test', exit_code: execution.exitCode, timed_out: execution.timedOut },
     artifacts: { root: artifactRoot, items: [{ kind: 'logs', path: stdoutPath }, { kind: 'logs', path: stderrPath }] },
