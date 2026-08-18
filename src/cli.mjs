@@ -5,6 +5,7 @@ import { runBrowserSpaceSpike } from '../spikes/browser-space/run.mjs';
 import { parseTtl, SpaceError, SpaceStore } from './space-store.mjs';
 import { installCodexSkill, setupSigloo } from './setup.mjs';
 import { AuthProfileStore, loginAuthProfile } from './auth-profile-store.mjs';
+import { SIGLOO_VERSION } from './version.mjs';
 
 const HELP = `Usage:
   sigloo doctor [--json]
@@ -206,7 +207,7 @@ export async function runCli(arguments_, {
       return 0;
     }
     if (command === '--version' || command === '-v') {
-      output.write('0.0.0\n');
+      output.write(`${SIGLOO_VERSION}\n`);
       return 0;
     }
     if (command === 'doctor') {

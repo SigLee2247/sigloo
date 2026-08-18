@@ -17,6 +17,8 @@ ownership, observation, evidence and cleanup consistent across drivers.
 
 The CLI is currently installed from a local checkout. No package is published yet.
 
+Current local beta: `0.1.0`.
+
 ## Local install
 
 Install a content-addressed release and the `sigloo` launcher, then initialize its private data root and companion
