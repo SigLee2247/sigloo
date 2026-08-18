@@ -163,7 +163,7 @@ export async function runDesktopSpace({
           return path;
         },
       });
-      try { await runScript(api); } catch (error) { scriptFailure = { type: error?.name ?? 'Error', message: error?.message ?? 'Desktop script failed' }; }
+      try { await runScript(api); } catch (error) { scriptFailure = { type: error?.name ?? 'Error', message: error?.message ?? 'Desktop script failed' }; childProcess?.kill('SIGTERM'); }
     }
     execution = await childPromise;
   } finally {
