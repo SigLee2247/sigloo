@@ -148,6 +148,21 @@ export async function runDesktopSpace({
           const expression = `(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!element) throw new Error('Desktop element not found'); element.focus(); element.value = ${JSON.stringify(value)}; element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`;
           return (await cdpCall(target, 'Runtime.evaluate', { expression, returnByValue: true })).result?.value ?? false;
         },
+        key: async (selector, key) => {
+          if (typeof selector !== 'string' || selector.length > 1_000 || typeof key !== 'string' || key.length > 32) throw new Error('Desktop key input is invalid');
+          actions.push({ action: 'key', target: selector, at: new Date().toISOString() });
+          await cdpCall(target, 'Runtime.evaluate', { expression: `(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!element) throw new Error('Desktop element not found'); element.focus(); return true; })()`, returnByValue: true });
+          await cdpCall(target, 'Input.dispatchKeyEvent', { type: 'keyDown', key, code: key });
+          await cdpCall(target, 'Input.dispatchKeyEvent', { type: 'keyUp', key, code: key });
+          return true;
+        },
+        type: async (selector, value) => {
+          if (typeof selector !== 'string' || selector.length > 1_000 || typeof value !== 'string' || value.length > 100_000) throw new Error('Desktop type input is invalid');
+          actions.push({ action: 'type', target: selector, at: new Date().toISOString() });
+          await cdpCall(target, 'Runtime.evaluate', { expression: `(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!element) throw new Error('Desktop element not found'); element.focus(); return true; })()`, returnByValue: true });
+          await cdpCall(target, 'Input.insertText', { text: value });
+          return true;
+        },
         crashRenderer: async () => {
           actions.push({ action: 'crashRenderer', at: new Date().toISOString() });
           await cdpCall(target, 'Page.crash');

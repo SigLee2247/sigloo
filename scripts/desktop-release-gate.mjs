@@ -23,6 +23,19 @@ await writeFile(script, `export default async function (desktop) {
     if (ready !== 'complete') await new Promise((resolve) => setTimeout(resolve, 250));
   }
   desktop.assert('document-ready', ready === 'complete');
+  if (process.env.SIGLOO_DESKTOP_TERMINAL === '1') {
+    let terminalReady = false;
+    for (let attempt = 0; attempt < 20 && !terminalReady; attempt += 1) {
+      terminalReady = await desktop.evaluate('document.querySelectorAll(".xterm-helper-textarea").length > 0');
+      if (!terminalReady) await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    desktop.assert('terminal-ready', terminalReady);
+    await desktop.click('.xterm-helper-textarea');
+    await desktop.type('.xterm-helper-textarea', 'printf SIGLOO_GATE');
+    await desktop.key('.xterm-helper-textarea', 'Enter');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    desktop.assert('terminal-output', (await desktop.evaluate('document.querySelector(".xterm-rows")?.innerText ?? ""')).includes('SIGLOO_GATE'));
+  }
   await desktop.screenshot('initial');
   desktop.close();
 }\n`);
