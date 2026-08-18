@@ -118,7 +118,7 @@ export async function runDesktopSpace({
       env: { ...process.env, SIGLOO_SPACE_ID: id, SIGLOO_SPACE_DRIVER: 'desktop', SIGLOO_DESKTOP_USER_DATA_DIR: userData, SIGLOO_ARTIFACT_DIR: artifactRoot },
       stdio: ['ignore', 'pipe', 'pipe'],
     }, stdoutPath, stderrPath, timeoutMs, (child) => { childProcess = child; });
-    renderer = await inspectRenderer(remoteDebuggingPort, Math.min(timeoutMs, 1_000));
+    renderer = await inspectRenderer(remoteDebuggingPort, Math.min(timeoutMs, 5_000));
     if (script) {
       const target = renderer.targets.find((item) => item.type === 'page' && item.webSocketDebuggerUrl);
       if (!target) throw new Error('Desktop renderer target was not found');
