@@ -108,4 +108,5 @@ environment variables and private stdout/stderr evidence. The app path is passed
 additional app arguments follow `--`. With `--script`, a local module can inspect `windows()`, evaluate bounded
 renderer expressions, assert named conditions and capture screenshots. This is an experimental Desktop Space, not
 an OS sandbox. Scripts may also use `click(selector)`, `fill(selector, value)`, `type(selector, value)`,
-`key(selector, key)` and `close()`; input values are not written to action evidence.
+`key(selector, key)`, `keyChord(keys)`, `clickAt(x, y)`, `drag(from, to)` and `close()`; input values are not
+written to action evidence.

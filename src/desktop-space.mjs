@@ -162,6 +162,30 @@ export async function runDesktopSpace({
           await cdpCall(target, 'Input.dispatchKeyEvent', { type: 'keyUp', key, code: key });
           return true;
         },
+        keyChord: async (keys) => {
+          if (!Array.isArray(keys) || keys.length < 1 || keys.length > 4 || keys.some((key) => typeof key !== 'string' || key.length > 32)) throw new Error('Desktop key chord is invalid');
+          actions.push({ action: 'keyChord', key_count: keys.length, at: new Date().toISOString() });
+          const modifiers = keys.reduce((mask, key) => mask | ({ Alt: 1, Control: 2, Meta: 4, Shift: 8 }[key] ?? 0), 0);
+          const mainKey = keys.at(-1);
+          await cdpCall(target, 'Input.dispatchKeyEvent', { type: 'rawKeyDown', key: mainKey, code: mainKey, modifiers });
+          await cdpCall(target, 'Input.dispatchKeyEvent', { type: 'keyUp', key: mainKey, code: mainKey, modifiers });
+          return true;
+        },
+        clickAt: async (x, y) => {
+          if (![x, y].every((value) => Number.isFinite(value) && value >= 0)) throw new Error('Desktop click coordinates are invalid');
+          actions.push({ action: 'clickAt', at: new Date().toISOString() });
+          await cdpCall(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
+          await cdpCall(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
+          return true;
+        },
+        drag: async (from, to) => {
+          if (![from?.x, from?.y, to?.x, to?.y].every((value) => Number.isFinite(value) && value >= 0)) throw new Error('Desktop drag coordinates are invalid');
+          actions.push({ action: 'drag', at: new Date().toISOString() });
+          await cdpCall(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: from.x, y: from.y, button: 'left', clickCount: 1 });
+          await cdpCall(target, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x: to.x, y: to.y, button: 'left' });
+          await cdpCall(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: to.x, y: to.y, button: 'left', clickCount: 1 });
+          return true;
+        },
         type: async (selector, value) => {
           if (typeof selector !== 'string' || selector.length > 1_000 || typeof value !== 'string' || value.length > 100_000) throw new Error('Desktop type input is invalid');
           actions.push({ action: 'type', target: selector, at: new Date().toISOString() });
