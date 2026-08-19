@@ -225,6 +225,10 @@ export async function runDesktopSpace({
           artifacts.push({ name: artifactName, path, media_type: 'image/png' });
           return path;
         },
+        reload: async () => {
+          actions.push({ action: 'reload', at: new Date().toISOString() });
+          await cdpCall(target, 'Page.reload', { ignoreCache: true });
+        },
       });
       try { await runScript(api); } catch (error) {
         scriptFailure = { type: error?.name ?? 'Error', message: error?.message ?? 'Desktop script failed' };
