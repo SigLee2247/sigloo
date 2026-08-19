@@ -1,0 +1,32 @@
+name: Sigloo CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm run check
+      - run: npm test
+      - run: npm run release:gate
+
+  desktop-gate:
+    if: ${{ vars.SIGLOO_DESKTOP_APP != '' && vars.SIGLOO_ELECTRON_PATH != '' }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm run release:gate:desktop
+        env:
+          SIGLOO_DESKTOP_APP: ${{ vars.SIGLOO_DESKTOP_APP }}
+          SIGLOO_ELECTRON_PATH: ${{ vars.SIGLOO_ELECTRON_PATH }}
+          SIGLOO_DESKTOP_TERMINAL: '1'
+          SIGLOO_DESKTOP_IPC: '1'
