@@ -15,6 +15,16 @@ function validateName(value) {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value)) throw new Error('Space name must be 1-64 letters, numbers, dots, underscores or hyphens');
 }
 
+function desktopEnvironment(spaceId, userData, artifactRoot) {
+  const environment = { ...process.env };
+  if (process.env.SIGLOO_ALLOW_SENSITIVE_ENV !== '1') {
+    for (const key of Object.keys(environment)) {
+      if (/(TOKEN|PASSWORD|SECRET|PRIVATE_KEY|API_KEY|AUTHORIZATION)/i.test(key)) delete environment[key];
+    }
+  }
+  return { ...environment, SIGLOO_SPACE_ID: spaceId, SIGLOO_SPACE_DRIVER: 'desktop', SIGLOO_DESKTOP_MODE: 'offscreen', SIGLOO_DESKTOP_CLIPBOARD_MODE: 'isolated', SIGLOO_DESKTOP_USER_DATA_DIR: userData, SIGLOO_ARTIFACT_DIR: artifactRoot };
+}
+
 async function runChild(executable, args, options, stdoutPath, stderrPath, timeoutMs, onSpawn = () => {}) {
   const stdout = [], stderr = [];
   const child = spawn(executable, args, options);
@@ -121,7 +131,7 @@ export async function runDesktopSpace({
   try {
     const childPromise = runChild(electronPath, [`--remote-debugging-port=${remoteDebuggingPort}`, appPath, ...args], {
       cwd: resolve(invocationDirectory),
-      env: { ...process.env, SIGLOO_SPACE_ID: id, SIGLOO_SPACE_DRIVER: 'desktop', SIGLOO_DESKTOP_MODE: 'offscreen', SIGLOO_DESKTOP_USER_DATA_DIR: userData, SIGLOO_ARTIFACT_DIR: artifactRoot },
+      env: desktopEnvironment(id, userData, artifactRoot),
       stdio: ['ignore', 'pipe', 'pipe'],
     }, stdoutPath, stderrPath, timeoutMs, (child) => { childProcess = child; });
     renderer = await inspectRenderer(remoteDebuggingPort, Math.min(timeoutMs, 5_000));
@@ -231,7 +241,7 @@ export async function runDesktopSpace({
   const report = {
     schema_version: 1, space_id: id, name, driver: 'desktop', isolation_level: 'electron-user-data-and-space-artifacts',
     status: passed ? 'passed' : 'failed', started_at: startedAt, finished_at: new Date().toISOString(),
-    desktop: { executable: basename(electronPath), app: appPath, remote_debugging_port: remoteDebuggingPort, renderer },
+    desktop: { executable: basename(electronPath), app: appPath, remote_debugging_port: remoteDebuggingPort, renderer, environment_policy: process.env.SIGLOO_ALLOW_SENSITIVE_ENV === '1' ? 'explicit-sensitive-env-opt-in' : 'sensitive-env-redacted' },
     result: { exit_code: execution.exitCode, signal: execution.signal, timed_out: execution.timedOut, spawn_error: execution.error?.code ?? null },
     failure: passed ? null : scriptFailure ?? { step: 'desktop-process', category: execution.error || execution.timedOut ? 'driver' : 'test', exit_code: execution.exitCode, timed_out: execution.timedOut },
     test: { assertions, actions },
