@@ -22,12 +22,18 @@ async function runChild(executable, args, options, stdoutPath, stderrPath, timeo
   child.stdout.on('data', (chunk) => stdout.push(chunk));
   child.stderr.on('data', (chunk) => stderr.push(chunk));
   let timedOut = false;
-  const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, timeoutMs);
+  let escalationTimer;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    child.kill('SIGTERM');
+    escalationTimer = setTimeout(() => child.kill('SIGKILL'), 2_000);
+  }, timeoutMs);
   const result = await new Promise((resolveResult) => {
     child.once('error', (error) => resolveResult({ exitCode: null, signal: null, error }));
     child.once('exit', (exitCode, signal) => resolveResult({ exitCode, signal, error: null }));
   });
   clearTimeout(timer);
+  if (escalationTimer) clearTimeout(escalationTimer);
   await writeFile(stdoutPath, Buffer.concat(stdout), { mode: 0o600 });
   await writeFile(stderrPath, Buffer.concat(stderr), { mode: 0o600 });
   return { ...result, timedOut };
@@ -167,7 +173,11 @@ export async function runDesktopSpace({
           actions.push({ action: 'crashRenderer', at: new Date().toISOString() });
           await cdpCall(target, 'Page.crash');
         },
-        close: () => { actions.push({ action: 'close', at: new Date().toISOString() }); childProcess?.kill('SIGTERM'); },
+        close: () => {
+          actions.push({ action: 'close', at: new Date().toISOString() });
+          childProcess?.kill('SIGTERM');
+          setTimeout(() => childProcess?.kill('SIGKILL'), 2_000).unref();
+        },
         assert(assertionName, condition) {
           validateName(assertionName, 'Assertion name');
           const passed = condition === true; assertions.push({ name: assertionName, passed });
@@ -182,7 +192,11 @@ export async function runDesktopSpace({
           return path;
         },
       });
-      try { await runScript(api); } catch (error) { scriptFailure = { type: error?.name ?? 'Error', message: error?.message ?? 'Desktop script failed' }; childProcess?.kill('SIGTERM'); }
+      try { await runScript(api); } catch (error) {
+        scriptFailure = { type: error?.name ?? 'Error', message: error?.message ?? 'Desktop script failed' };
+        childProcess?.kill('SIGTERM');
+        setTimeout(() => childProcess?.kill('SIGKILL'), 2_000).unref();
+      }
     }
     execution = await childPromise;
   } finally {
