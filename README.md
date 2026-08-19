@@ -109,4 +109,7 @@ additional app arguments follow `--`. With `--script`, a local module can inspec
 renderer expressions, assert named conditions and capture screenshots. This is an experimental Desktop Space, not
 an OS sandbox. Scripts may also use `click(selector)`, `fill(selector, value)`, `type(selector, value)`,
 `key(selector, key)`, `keyChord(keys)`, `clickAt(x, y)`, `drag(from, to)` and `close()`; input values are not
-written to action evidence. `reload()` is available for persistence and restart-style checks.
+written to action evidence. `reload()` is available for persistence and restart-style checks. Desktop children run
+offscreen by default, redact environment keys matching common secret patterns, and set
+`SIGLOO_DESKTOP_CLIPBOARD_MODE=isolated`; sensitive environment inheritance requires
+`SIGLOO_ALLOW_SENSITIVE_ENV=1` explicitly.
