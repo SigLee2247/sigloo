@@ -25,6 +25,9 @@ test('local install, update, setup, Skill install, restart and uninstall are rec
 
     const second = JSON.parse((await execFileAsync(process.execPath, [installer, ...installArgs])).stdout);
     assert.equal(second.digest, first.digest);
+    const rollback = JSON.parse((await execFileAsync(process.execPath, [installer, 'rollback', '--digest', first.digest.slice('sha256:'.length), '--install-root', installRoot, '--bin-dir', binDirectory])).stdout);
+    assert.equal(rollback.status, 'rolled_back');
+    assert.equal(rollback.digest, first.digest);
     assert.match((await execFileAsync(command, ['--help'])).stdout, /sigloo create NAME/);
 
     const setup = JSON.parse((await execFileAsync(command, ['setup', '--json'], {

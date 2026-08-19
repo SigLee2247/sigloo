@@ -21,17 +21,19 @@ const RELEASE_INPUTS = [
 
 function parseArguments(arguments_) {
   const command = arguments_[0];
-  if (!['install', 'uninstall'].includes(command)) throw new Error('Usage: install-local.mjs install|uninstall [--install-root PATH] [--bin-dir PATH]');
+  if (!['install', 'uninstall', 'rollback'].includes(command)) throw new Error('Usage: install-local.mjs install|uninstall|rollback [--digest HEX] [--install-root PATH] [--bin-dir PATH]');
   const options = {
     command,
     installRoot: process.env.SIGLOO_INSTALL_ROOT ?? join(homedir(), '.local', 'share', 'sigloo'),
     binDirectory: process.env.SIGLOO_BIN_DIR ?? join(homedir(), '.local', 'bin'),
+    digest: null,
   };
   for (let index = 1; index < arguments_.length; index += 1) {
     const token = arguments_[index];
-    if (!['--install-root', '--bin-dir'].includes(token) || !arguments_[index + 1]) throw new Error(`Unknown or incomplete option: ${token}`);
+    if (!['--install-root', '--bin-dir', '--digest'].includes(token) || !arguments_[index + 1]) throw new Error(`Unknown or incomplete option: ${token}`);
     if (token === '--install-root') options.installRoot = arguments_[index + 1];
-    else options.binDirectory = arguments_[index + 1];
+    else if (token === '--bin-dir') options.binDirectory = arguments_[index + 1];
+    else options.digest = arguments_[index + 1];
     index += 1;
   }
   options.installRoot = resolve(options.installRoot);
@@ -132,6 +134,27 @@ async function install({ installRoot, binDirectory }) {
   return { status: 'installed', digest, release, command: commandPath };
 }
 
+async function pointCommand({ installRoot, binDirectory, digest }) {
+  if (!/^([a-f0-9]{64})$/.test(digest ?? '')) throw new Error('--digest must be a 64-character SHA-256 hex value');
+  const release = join(resolve(installRoot), 'releases', digest);
+  const manifest = JSON.parse(await readFile(join(release, 'release.json'), 'utf8'));
+  if (manifest.digest !== `sha256:${digest}`) throw new Error('Release manifest digest mismatch');
+  const commandPath = join(resolve(binDirectory), 'sigloo');
+  const target = join(release, 'bin', 'sigloo.mjs');
+  try {
+    const current = await lstat(commandPath);
+    if (!current.isSymbolicLink()) throw new Error(`Refusing to replace non-symlink command: ${commandPath}`);
+    const currentTarget = resolve(dirname(commandPath), await readlink(commandPath));
+    if (!currentTarget.startsWith(`${join(resolve(installRoot), 'releases')}${sep}`)) throw new Error('Refusing to replace command outside Sigloo releases');
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  const temporaryLink = join(resolve(binDirectory), `.sigloo.rollback.${process.pid}.${randomUUID()}.tmp`);
+  await symlink(target, temporaryLink);
+  await rename(temporaryLink, commandPath);
+  return { status: 'rolled_back', digest: `sha256:${digest}`, release, command: commandPath };
+}
+
 async function uninstall({ installRoot, binDirectory }) {
   const commandPath = join(binDirectory, 'sigloo');
   const metadata = await lstat(commandPath);
@@ -145,7 +168,7 @@ async function uninstall({ installRoot, binDirectory }) {
 
 try {
   const options = parseArguments(process.argv.slice(2));
-  const result = options.command === 'install' ? await install(options) : await uninstall(options);
+  const result = options.command === 'install' ? await install(options) : options.command === 'rollback' ? await pointCommand(options) : await uninstall(options);
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 } catch (error) {
   process.stderr.write(`sigloo installer: ${error.message}\n`);
