@@ -39,6 +39,8 @@ await writeFile(script, `export default async function (desktop) {
   if (process.env.SIGLOO_DESKTOP_IPC === '1') {
     const fontSize = await desktop.evaluate('window.sigterm.invoke("config:get", { key: "terminal.fontSize", fallback: 13 })');
     desktop.assert('config-ipc', typeof fontSize === 'number');
+    desktop.assert('config-set-ipc', await desktop.evaluate('window.sigterm.invoke("config:set", { key: "terminal.fontSize", value: 14 })') === true);
+    desktop.assert('config-roundtrip', await desktop.evaluate('window.sigterm.invoke("config:get", { key: "terminal.fontSize", fallback: 13 })') === 14);
   }
   await desktop.screenshot('initial');
   desktop.close();
