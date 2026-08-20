@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,7 +28,10 @@ export async function setupSigloo() {
 export async function installCodexSkill({
   skillsRoot = process.env.SIGLOO_CODEX_SKILLS_DIR ?? join(homedir(), '.codex', 'skills'),
 } = {}) {
-  const source = fileURLToPath(new URL('../skills/sigloo/SKILL.md', import.meta.url));
+  const sourceRoot = fileURLToPath(new URL('../skills', import.meta.url));
+  const bundled = ['sigloo', 'sigloo-browser', 'sigloo-desktop', 'sigloo-process', 'sigloo-release'];
+  const installed = [];
+  const source = join(sourceRoot, 'sigloo', 'SKILL.md');
   const bytes = await readFile(source);
   const destinationDirectory = resolve(skillsRoot, 'sigloo');
   const destination = join(destinationDirectory, 'SKILL.md');
@@ -48,11 +51,22 @@ export async function installCodexSkill({
   await writeFile(temporary, bytes, { mode: 0o600 });
   await rename(temporary, destination);
   await chmod(destination, 0o600);
+  installed.push({ name: 'sigloo', path: destination, digest: digest(bytes), previous_digest: previous });
+  for (const name of bundled.slice(1)) {
+    const sourceDirectory = join(sourceRoot, name);
+    const destinationDirectory = resolve(skillsRoot, name);
+    await mkdir(destinationDirectory, { recursive: true, mode: 0o700 });
+    await cp(sourceDirectory, destinationDirectory, { recursive: true, force: true });
+    const installedSkill = await readFile(join(destinationDirectory, 'SKILL.md'));
+    await chmod(join(destinationDirectory, 'SKILL.md'), 0o600);
+    installed.push({ name, path: join(destinationDirectory, 'SKILL.md'), digest: digest(installedSkill), previous_digest: null });
+  }
   return {
     status: 'installed',
     agent: 'codex',
     path: destination,
     digest: digest(bytes),
     previous_digest: previous,
+    skills: installed,
   };
 }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sigloo Browser"
+  short_description: "Run isolated browser E2E spaces"
+  default_prompt: "Use $sigloo-browser to run an isolated browser E2E test with evidence."
