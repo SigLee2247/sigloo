@@ -219,6 +219,7 @@ export default async function (desktop) {
 - `drag(from, to)` — 좌표 drag
 - `setInputFiles(selector, paths)` — native picker 없이 file input 주입
 - `handleDialog({ accept, promptText })` — JavaScript dialog 처리
+- `menu(id)` — 앱이 제공하는 offscreen native menu bridge 호출
 - `reload()` — persistence/restart 검사
 - `screenshot(name)` — 화면 artifact
 - `close()` — 정상 종료 요청

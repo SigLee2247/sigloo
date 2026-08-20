@@ -236,6 +236,12 @@ export async function runDesktopSpace({
           await cdpCall(target, 'Page.handleJavaScriptDialog', { accept: Boolean(accept), ...(promptText === undefined ? {} : { promptText }) });
           return true;
         },
+        menu: async (id) => {
+          if (typeof id !== 'string' || !/^[A-Za-z0-9._-]{1,64}$/.test(id)) throw new Error('Desktop menu id is invalid');
+          actions.push({ action: 'menu', target: id, at: new Date().toISOString() });
+          const expression = `window.sigterm?.invoke ? window.sigterm.invoke('menu:invoke', { id: ${JSON.stringify(id)} }) : Promise.reject(new Error('App menu bridge is unavailable'))`;
+          return (await cdpCall(target, 'Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })).result?.value ?? null;
+        },
         type: async (selector, value) => {
           if (typeof selector !== 'string' || selector.length > 1_000 || typeof value !== 'string' || value.length > 100_000) throw new Error('Desktop type input is invalid');
           actions.push({ action: 'type', target: selector, at: new Date().toISOString() });
