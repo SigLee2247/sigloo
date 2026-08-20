@@ -248,7 +248,14 @@ export async function runDesktopSpace({
     desktop: { executable: basename(electronPath), app: appPath, remote_debugging_port: remoteDebuggingPort, renderer, environment_policy: process.env.SIGLOO_ALLOW_SENSITIVE_ENV === '1' ? 'explicit-sensitive-env-opt-in' : 'sensitive-env-redacted' },
     result: { exit_code: execution.exitCode, signal: execution.signal, timed_out: execution.timedOut, spawn_error: execution.error?.code ?? null },
     failure: passed ? null : scriptFailure ?? { step: 'desktop-process', category: execution.error || execution.timedOut ? 'driver' : 'test', exit_code: execution.exitCode, timed_out: execution.timedOut },
-    test: { assertions, actions },
+    test: {
+      title: `${name} Desktop Space 실행 검증`,
+      purpose: `화면에 창을 띄우지 않는 offscreen Electron Space에서 ${appPath}의 renderer·UI·IPC·종료 동작을 확인한다.`,
+      preconditions: ['Electron executable과 앱 경로가 존재한다.', '앱이 SIGLOO_DESKTOP_MODE=offscreen 계약을 지원한다.'],
+      steps: ['임시 userData 및 remote debugging endpoint 생성', 'Electron 앱 offscreen 실행', 'renderer target 선택 및 script action/assert 실행', 'SIGTERM/SIGKILL escalation과 userData cleanup 확인'],
+      success_criteria: ['script assertion이 모두 통과한다.', '앱이 정상 종료되거나 bounded failure로 수렴한다.', 'resources_remaining이 false이다.'],
+      assertions, actions,
+    },
     artifacts: { root: artifactRoot, items: [{ kind: 'logs', path: stdoutPath }, { kind: 'logs', path: stderrPath }, ...artifacts] },
     cleanup: { user_data_removed: userDataRemoved, resources_remaining: !userDataRemoved },
   };

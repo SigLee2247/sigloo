@@ -230,7 +230,14 @@ export async function runBrowserTestSpace({
       input_events: 0,
       closed: true,
     },
-    test: { script_digest: loadedTest.digest, checks, actions },
+    test: {
+      title: `${name} Browser Space 실행 검증`,
+      purpose: `격리된 BrowserContext에서 ${initialUrl}을 열고 Auth Profile 파생 상태와 브라우저 상호작용을 확인한다.`,
+      preconditions: ['동일 origin의 owner-only Auth Profile이 준비되어 있다.', '브라우저 테스트 모듈이 default function을 export한다.'],
+      steps: ['임시 Chrome 프로필 생성', 'BrowserContext 및 Auth Profile 파생', '테스트 script의 snapshot/action/assert 실행', 'screenshot·viewer·브라우저 리소스 cleanup 확인'],
+      success_criteria: ['named assertion이 모두 통과한다.', 'Auth Profile 원본이 변경되지 않는다.', 'resources_remaining이 false이다.'],
+      script_digest: loadedTest.digest, checks, actions,
+    },
     auth_profile: {
       digest: loadedProfile.digest,
       origin: loadedProfile.profile.origin,

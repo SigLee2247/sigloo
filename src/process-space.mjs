@@ -134,6 +134,13 @@ export async function runProcessSpace({
     status: succeeded ? 'passed' : 'failed',
     started_at: startedAt,
     finished_at: finishedAt,
+    test: {
+      title: `${name} Process Space 실행 검증`,
+      purpose: '기존 명령을 프로젝트 작업 디렉터리에서 실행하고, 환경 전달·로그 수집·artifact inventory·임시 공간 정리를 확인한다.',
+      preconditions: ['Sigloo data root가 초기화되어 있다.', '실행 명령이 호출 디렉터리에서 유효하다.'],
+      steps: ['Process Space 생성', '기존 명령 실행', 'stdout/stderr 및 artifact 수집', '임시 공간 cleanup invariant 확인'],
+      success_criteria: ['명령 exit code가 0이다.', 'resources_remaining이 false이다.'],
+    },
     command: {
       executable: basename(command),
       arguments_digest: digest(args),
