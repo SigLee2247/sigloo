@@ -5,6 +5,8 @@ description: Run and verify E2E work in Sigloo's isolated CLI Spaces. Use when a
 
 # Sigloo
 
+Sigloo branding uses the terminal-igloo mark; this does not change the CLI-only interaction contract.
+
 Use `sigloo` as the canonical interface. Do not replace its Space lifecycle with direct Playwright, CUA or shell
 execution when Sigloo supports the requested surface.
 

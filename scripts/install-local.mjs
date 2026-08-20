@@ -16,6 +16,7 @@ const RELEASE_INPUTS = [
   'scripts',
   'skills',
   'docs/reference',
+  'docs/branding',
   'spikes/browser-space',
 ];
 

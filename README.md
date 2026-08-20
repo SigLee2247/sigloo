@@ -19,6 +19,9 @@ The CLI is currently installed from a local checkout. No package is published ye
 
 Current local beta: `0.1.0`.
 
+Branding assets live in [`docs/branding`](/Users/siglee/Desktop/project/private/sigloo/docs/branding), including the
+Sigloo mark, wordmark and macOS `.icns` icon generated from the selected terminal-igloo direction.
+
 ## Local install
 
 Install a content-addressed release and the `sigloo` launcher, then initialize its private data root and companion
