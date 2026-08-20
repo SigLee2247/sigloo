@@ -7,6 +7,7 @@ import { installCodexSkill, setupSigloo } from './setup.mjs';
 import { AuthProfileStore, loginAuthProfile } from './auth-profile-store.mjs';
 import { SIGLOO_VERSION } from './version.mjs';
 import { runDesktopSpace } from './desktop-space.mjs';
+import { runPlaywrightTest } from './playwright-run.mjs';
 
 const HELP = `Usage:
   sigloo doctor [--json]
@@ -25,6 +26,7 @@ const HELP = `Usage:
   sigloo destroy SPACE [--json]
   sigloo run SPACE -- COMMAND [ARG...]
   sigloo run [--name NAME] [--evidence-dir PATH] -- COMMAND [ARG...]
+  sigloo playwright run [--name NAME] [--evidence-dir PATH] -- [PLAYWRIGHT ARG...]
   sigloo browser run --url URL --script PATH [--auth-profile PATH] [--viewer] [options]
   sigloo browser probe [--json]
   sigloo desktop run --app PATH --electron-path PATH [--script PATH] [--timeout-ms N] [-- ARG...]
@@ -41,6 +43,7 @@ Commands:
   complete       Mark a Space complete while preserving artifacts
   destroy        Remove a Space and emit cleanup state
   run            Run a command in a temporary Process Space
+  playwright run Run native Playwright CLI in a Process Space
   browser run    Run a JavaScript test in an isolated Browser Space
   browser probe  Verify BrowserContext isolation with stock Chromium
   desktop run    Run an Electron app with isolated user data and bounded evidence
@@ -189,6 +192,28 @@ function parseDesktopRun(arguments_) {
   if (!options.electronPath) throw new Error('desktop run requires --electron-path');
   if (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1_000 || options.timeoutMs > 300_000) throw new Error('--timeout-ms must be an integer between 1000 and 300000');
   return options;
+}
+
+function parsePlaywrightRun(arguments_) {
+  let name = 'playwright-e2e';
+  let evidenceDirectory = '.sigloo/evidence';
+  const separator = arguments_.indexOf('--');
+  const options = separator < 0 ? arguments_ : arguments_.slice(0, separator);
+  for (let index = 0; index < options.length; index += 1) {
+    const token = options[index];
+    if (token === '--json') continue;
+    if (token === '--name' || token === '--evidence-dir') {
+      const value = options[index + 1];
+      if (!value) throw new Error(`${token} requires a value`);
+      if (token === '--name') name = value;
+      else evidenceDirectory = value;
+      index += 1;
+      continue;
+    }
+    throw new Error(`Unknown playwright run option: ${token}`);
+  }
+  const command = separator < 0 ? [] : arguments_.slice(separator + 1);
+  return { name, evidenceDirectory, args: command.length ? command : ['npx', 'playwright', 'test'] };
 }
 
 function parseAuth(command, arguments_) {
@@ -347,6 +372,12 @@ export async function runCli(arguments_, {
       const { report, evidencePath } = await runDesktopSpace({ ...options, invocationDirectory });
       output.write(`SIGLOO_RECEIPT ${JSON.stringify({ space_id: report.space_id, status: report.status, evidence: evidencePath, artifacts: report.artifacts.items.map((artifact) => artifact.path), cleanup: report.cleanup })}\n`);
       return report.status === 'passed' ? 0 : 1;
+    }
+    if (command === 'playwright' && rest[0] === 'run') {
+      const options = parsePlaywrightRun(rest.slice(1));
+      const { report, evidencePath } = await runPlaywrightTest({ ...options, invocationDirectory });
+      output.write(`SIGLOO_RECEIPT ${JSON.stringify({ space_id: report.space_id, status: report.status, evidence: evidencePath, artifacts: report.artifacts.items.map((artifact) => artifact.path), cleanup: report.cleanup })}\n`);
+      return report.result.exit_code ?? 1;
     }
     if (command === 'run') {
       const options = parseRun(rest);

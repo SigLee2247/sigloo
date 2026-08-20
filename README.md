@@ -84,6 +84,17 @@ sigloo run \
   -- npx playwright test
 ```
 
+Playwright 전용 어댑터를 사용하면 명령과 인자를 그대로 유지하면서 Process Space
+evidence를 남길 수 있습니다.
+
+```bash
+sigloo playwright run --name playwright-e2e -- npx playwright test
+```
+
+`--` 뒤의 명령을 생략하면 기본값으로 `npx playwright test`를 실행합니다. 어댑터는
+Playwright 설정·reporter·browser lifecycle을 변경하지 않으며, 기존 테스트가 쓰는
+`SIGLOO_*` artifact 경로와 종료 코드를 그대로 전달합니다.
+
 자식 프로세스에는 다음 경로가 전달됩니다.
 
 - `SIGLOO_SPACE_ID`
