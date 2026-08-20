@@ -217,6 +217,8 @@ export default async function (desktop) {
 - `fill(selector, value)` / `type(selector, value)` — 입력
 - `key(selector, key)` / `keyChord(keys)` — 키 입력·단축키
 - `drag(from, to)` — 좌표 drag
+- `setInputFiles(selector, paths)` — native picker 없이 file input 주입
+- `handleDialog({ accept, promptText })` — JavaScript dialog 처리
 - `reload()` — persistence/restart 검사
 - `screenshot(name)` — 화면 artifact
 - `close()` — 정상 종료 요청

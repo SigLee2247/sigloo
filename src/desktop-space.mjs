@@ -216,6 +216,26 @@ export async function runDesktopSpace({
           await cdpCall(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: to.x, y: to.y, button: 'left', clickCount: 1 });
           return true;
         },
+        setInputFiles: async (selector, paths) => {
+          if (typeof selector !== 'string' || !Array.isArray(paths) || paths.some((path) => typeof path !== 'string')) throw new Error('Desktop file input is invalid');
+          actions.push({ action: 'setInputFiles', target: selector, count: paths.length, at: new Date().toISOString() });
+          await cdpCall(target, 'DOM.enable');
+          const documentResult = await cdpCall(target, 'DOM.getDocument', { depth: -1, pierce: true });
+          const idMatch = /^#([A-Za-z0-9_-]+)$/.exec(selector);
+          const findNode = (node) => {
+            if (idMatch && node.attributes?.some((value, index) => index % 2 === 0 && value === 'id' && node.attributes[index + 1] === idMatch[1])) return node;
+            return node.children?.map(findNode).find(Boolean);
+          };
+          const node = findNode(documentResult.root);
+          if (!node?.backendNodeId) throw new Error('Desktop file input was not found');
+          await cdpCall(target, 'DOM.setFileInputFiles', { backendNodeId: node.backendNodeId, files: paths });
+          return true;
+        },
+        handleDialog: async ({ accept = false, promptText } = {}) => {
+          actions.push({ action: 'handleDialog', accepted: Boolean(accept), at: new Date().toISOString() });
+          await cdpCall(target, 'Page.handleJavaScriptDialog', { accept: Boolean(accept), ...(promptText === undefined ? {} : { promptText }) });
+          return true;
+        },
         type: async (selector, value) => {
           if (typeof selector !== 'string' || selector.length > 1_000 || typeof value !== 'string' || value.length > 100_000) throw new Error('Desktop type input is invalid');
           actions.push({ action: 'type', target: selector, at: new Date().toISOString() });
