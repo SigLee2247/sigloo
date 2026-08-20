@@ -1,39 +1,46 @@
-# Sigloo E2E Report
+# Sigloo E2E 실행 리포트
 
-## Run
+## 실행 요약
 
-- Status: `{{status}}`
-- Driver: `{{driver}}`
+- 결과: `{{status}}`
+- 테스트 유형: `{{driver}}`
 - Space: `{{space_id}}`
-- Name: `{{name}}`
-- Started: `{{started_at}}`
-- Finished: `{{finished_at}}`
-- Isolation: `{{isolation_level}}`
+- 테스트 이름: `{{name}}`
+- 시작/종료: `{{started_at}}` / `{{finished_at}}`
+- 격리 방식: `{{isolation_level}}`
 
-## Summary
+## 이 테스트는 무엇을 확인했나
 
-{{summary}}
+{{purpose}}
 
-## Assertions
+## 대상
+
+{{target}}
+
+## 검증 시나리오
 
 {{assertions}}
 
-## Actions
+## 수행한 동작
 
 {{actions}}
 
-## Failure
+## 결과 수치
+
+{{summary}}
+
+## 실패 원인
 
 {{failure}}
 
-## Artifacts
+## 첨부 artifact
 
 {{artifacts}}
 
-## Cleanup
+## 정리 상태
 
 {{cleanup}}
 
-## Safety
+## 보안 메모
 
-Input values, cookies, storage values, tokens and credentials are intentionally omitted from this report.
+입력값, 쿠키, storage 값, 토큰, 비밀번호와 credential 원문은 리포트에 기록하지 않습니다.
