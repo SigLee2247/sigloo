@@ -16,6 +16,30 @@ function spaceId(name) {
   return `${name}-${time}-${randomUUID().slice(0, 8)}`;
 }
 
+function childEnvironment(id, directory, artifactDirectories) {
+  const mode = process.env.SIGLOO_PROCESS_ENV_MODE ?? 'inherit';
+  let environment = { ...process.env };
+  if (mode === 'allowlist') {
+    const allowed = new Set((process.env.SIGLOO_PROCESS_ENV_ALLOWLIST ?? '').split(',').map((key) => key.trim()).filter(Boolean));
+    environment = Object.fromEntries(Object.entries(environment).filter(([key]) => allowed.has(key) || key.startsWith('SIGLOO_')));
+  } else if (mode === 'redact') {
+    environment = Object.fromEntries(Object.entries(environment).filter(([key]) => !/(TOKEN|PASSWORD|SECRET|PRIVATE_KEY|API_KEY|AUTHORIZATION)/i.test(key)));
+  } else if (!['inherit', 'allowlist', 'redact'].includes(mode)) {
+    throw new Error('SIGLOO_PROCESS_ENV_MODE must be inherit, redact or allowlist');
+  }
+  return {
+    ...environment,
+    SIGLOO_SPACE_ID: id,
+    SIGLOO_SPACE_DIR: directory,
+    SIGLOO_SPACE_DRIVER: 'process',
+    SIGLOO_ARTIFACT_DIR: artifactDirectories.root,
+    SIGLOO_LOG_DIR: artifactDirectories.logs,
+    SIGLOO_TRACE_DIR: artifactDirectories.trace,
+    SIGLOO_REPORT_DIR: artifactDirectories.report,
+    SIGLOO_SCREENSHOT_DIR: artifactDirectories.screenshots,
+  };
+}
+
 async function waitForChild(command, args, options, { stdoutPath, stderrPath, mirrorOutput }) {
   const result = await new Promise((resolveExecution) => {
     const child = spawn(command, args, options);
@@ -99,17 +123,7 @@ export async function runProcessSpace({
   try {
     execution = await waitForChild(command, args, {
       cwd: commandDirectory,
-      env: {
-        ...process.env,
-        SIGLOO_SPACE_ID: id,
-        SIGLOO_SPACE_DIR: directory,
-        SIGLOO_SPACE_DRIVER: 'process',
-        SIGLOO_ARTIFACT_DIR: artifactDirectories.root,
-        SIGLOO_LOG_DIR: artifactDirectories.logs,
-        SIGLOO_TRACE_DIR: artifactDirectories.trace,
-        SIGLOO_REPORT_DIR: artifactDirectories.report,
-        SIGLOO_SCREENSHOT_DIR: artifactDirectories.screenshots,
-      },
+      env: childEnvironment(id, directory, artifactDirectories),
       stdio: stdio === 'inherit' ? ['inherit', 'pipe', 'pipe'] : ['ignore', 'pipe', 'pipe'],
     }, { stdoutPath, stderrPath, mirrorOutput: stdio === 'inherit' });
   } finally {
@@ -146,6 +160,7 @@ export async function runProcessSpace({
       executable: basename(command),
       arguments_digest: digest(args),
     },
+    process_policy: { environment: process.env.SIGLOO_PROCESS_ENV_MODE ?? 'inherit', filesystem: 'project-cwd-compatible', network: 'inherited' },
     result: {
       exit_code: execution.exitCode,
       signal: execution.signal,

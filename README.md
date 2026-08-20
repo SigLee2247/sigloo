@@ -109,6 +109,15 @@ Playwright 설정·reporter·browser lifecycle을 변경하지 않으며, 기존
 
 Process Space는 프로젝트 작업 디렉터리를 유지합니다. 따라서 기존 명령은 그대로 실행되지만 프로젝트 파일을 수정할 수 있습니다. VM·container·OS 보안 샌드박스가 아닙니다.
 
+환경변수 정책은 기본 `inherit`입니다. 민감값을 제거하려면 `redact`, 허용 목록만 전달하려면 `allowlist`를 사용합니다.
+
+```bash
+SIGLOO_PROCESS_ENV_MODE=redact sigloo run --name safe-check -- npm test
+SIGLOO_PROCESS_ENV_MODE=allowlist \
+SIGLOO_PROCESS_ENV_ALLOWLIST=PATH,NODE_ENV \
+sigloo run --name minimal-check -- npm test
+```
+
 ## 2. Browser Space — 웹 E2E
 
 ### Auth Profile 만들기
