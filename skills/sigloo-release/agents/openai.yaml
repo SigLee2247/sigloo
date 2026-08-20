@@ -1,4 +1,4 @@
 interface:
   display_name: "Sigloo Release"
   short_description: "Run gates and verify cleanup"
-  default_prompt: "Use $sigloo-release to run the Sigloo release gate and verify cleanup evidence."
+  default_prompt: "Use $sigloo-release when the user asks for pre-release testing, install verification, rollback, release gates, or cleanup evidence."

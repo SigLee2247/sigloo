@@ -1,4 +1,4 @@
 interface:
   display_name: "Sigloo Browser"
   short_description: "Run isolated browser E2E spaces"
-  default_prompt: "Use $sigloo-browser to run an isolated browser E2E test with evidence."
+  default_prompt: "Use $sigloo-browser when the user asks for a browser/web E2E or Playwright test in Korean or English, and run it in an isolated Space with evidence."

@@ -1,4 +1,4 @@
 interface:
   display_name: "Sigloo Desktop"
   short_description: "Test Electron apps offscreen"
-  default_prompt: "Use $sigloo-desktop to test an Electron app in an offscreen isolated Space."
+  default_prompt: "Use $sigloo-desktop when the user asks to test an Electron, SigTerm, renderer, IPC, or desktop app without showing windows, and run it offscreen."

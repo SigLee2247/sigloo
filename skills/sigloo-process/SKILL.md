@@ -1,9 +1,11 @@
 ---
 name: sigloo-process
-description: Run existing shell, Node, Playwright or test commands inside Sigloo Process Spaces with preserved project cwd, isolated scratch/artifact directories, bounded evidence and deterministic cleanup. Use when an existing E2E or build command must run away from the user's active environment.
+description: Run existing shell, Node, Playwright or test commands inside Sigloo Process Spaces with preserved project cwd, isolated scratch/artifact directories, bounded evidence and deterministic cleanup. Trigger for '기존 npm test 격리 실행', '이 명령 그대로 돌려줘', '프로젝트 명령을 분리해서 실행', 'Playwright 명령 실행', 'run the existing command in a Space', or build/test process isolation requests.
 ---
 
 # Sigloo Process
+
+Natural-language triggers: “기존 명령 그대로”, “npm test 격리 실행”, “shell 명령 분리”, “프로젝트 cwd 유지”, “Playwright suite 실행”, “run this command in Process Space”.
 
 Preserve the existing command. Sigloo does not require a test DSL and Process Space is not an OS sandbox.
 

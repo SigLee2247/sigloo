@@ -1,9 +1,11 @@
 ---
 name: sigloo-desktop
-description: Test Electron applications in Sigloo's offscreen Desktop Space without putting windows or input on the user's screen. Use for renderer DOM checks, terminal/PTY smoke tests, IPC checks, screenshots, multi-window flows, crash recovery and deterministic cleanup.
+description: Test Electron applications in Sigloo's offscreen Desktop Space without putting windows or input on the user's screen. Trigger for 'Electron 앱 테스트해줘', 'SigTerm 테스트해줘', '화면에 띄우지 말고 앱 검사', '데스크톱 앱 E2E', 'renderer/IPC 확인', 'terminal 입력 테스트', or Electron desktop smoke and crash-recovery requests.
 ---
 
 # Sigloo Desktop
+
+Natural-language triggers: “Electron 앱 테스트”, “SigTerm dogfood”, “창을 띄우지 않고 테스트”, “renderer 검사”, “IPC 테스트”, “터미널 입력 검증”, “desktop smoke test”.
 
 Desktop Space launches Electron with isolated `userData`, offscreen rendering, a bounded DevTools connection and private evidence. It is experimental and requires an app that honors `SIGLOO_DESKTOP_MODE=offscreen` for true window suppression.
 

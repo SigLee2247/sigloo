@@ -1,9 +1,11 @@
 ---
 name: sigloo-browser
-description: Run browser E2E tests in Sigloo Browser Spaces with isolated BrowserContexts, explicit Auth Profiles, optional Viewer takeover, bounded actions and cleanup evidence. Use for website smoke tests, Playwright-compatible suites, login-state tests and browser isolation checks.
+description: Run browser E2E tests in Sigloo Browser Spaces with isolated BrowserContexts, explicit Auth Profiles, optional Viewer takeover, bounded actions and cleanup evidence. Trigger for '웹사이트 테스트해줘', '브라우저 E2E 돌려줘', 'Playwright 격리 실행', '로그인 상태로 테스트', '페이지 클릭/입력 테스트', 'run a browser smoke test', or browser isolation requests.
 ---
 
 # Sigloo Browser
+
+Natural-language triggers: “웹 E2E”, “브라우저 테스트”, “Playwright 실행”, “로그인한 상태로 웹 테스트”, “페이지를 클릭하고 검증”, “browser smoke test”.
 
 Use the `sigloo` CLI as the canonical interface. Do not attach to the user's existing browser profile.
 

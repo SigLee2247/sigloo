@@ -1,9 +1,11 @@
 ---
 name: sigloo-release
-description: Run Sigloo's release gates, inspect bounded evidence, verify Browser/Process/Desktop cleanup and manage immutable local release installation and rollback. Use before committing a release, after runtime changes or when validating a new installation.
+description: Run Sigloo's release gates, inspect bounded evidence, verify Browser/Process/Desktop cleanup and manage immutable local release installation and rollback. Trigger for '배포 전 전체 테스트', '릴리스 게이트 돌려줘', '설치 검증해줘', 'rollback 해줘', '출시 전 점검', 'run the release gate', or requests to verify a new installation.
 ---
 
 # Sigloo Release
+
+Natural-language triggers: “배포 전 검증”, “릴리스 게이트”, “설치본 확인”, “rollback”, “출시 전 전체 테스트”, “verify release cleanup”, “run all gates”.
 
 Use the narrowest gate that proves the change, then run the unified gate before a release decision.
 

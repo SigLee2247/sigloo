@@ -1,9 +1,11 @@
 ---
 name: sigloo
-description: Run and verify E2E work in Sigloo's isolated CLI Spaces. Use when an agent needs to execute tests or commands away from the user's active environment, inspect Sigloo driver readiness, verify Browser Space isolation, collect evidence, or confirm deterministic cleanup with the `sigloo` CLI.
+description: Run and verify E2E work in Sigloo's isolated CLI Spaces. Trigger when the user says 'Sigloo로 테스트해줘', '격리된 공간에서 실행해줘', 'E2E 돌려줘', '테스트 환경을 분리해줘', 'run this in an isolated Space', or asks to inspect readiness, evidence or cleanup.
 ---
 
 # Sigloo
+
+Natural-language triggers: “Sigloo로 실행”, “격리해서 테스트”, “E2E 테스트”, “Space 만들어서 돌려”, “run isolated”, “collect evidence”, “check cleanup”.
 
 Sigloo branding uses the terminal-igloo mark; this does not change the CLI-only interaction contract.
 

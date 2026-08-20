@@ -1,4 +1,4 @@
 interface:
   display_name: "Sigloo Process"
   short_description: "Run commands in Process Spaces"
-  default_prompt: "Use $sigloo-process to run this existing command in an isolated Process Space."
+  default_prompt: "Use $sigloo-process when the user asks to run an existing npm, shell, Node, Playwright, or build command unchanged in an isolated Process Space."
