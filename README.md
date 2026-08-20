@@ -12,6 +12,8 @@ Sigloo는 AI Agent와 개발자가 브라우저·프로세스·Electron 앱을 �
 
 현재 버전은 `0.1.0` 로컬 베타입니다. 공개 package publish는 아직 하지 않았습니다.
 
+소스 코드는 [MIT License](LICENSE)로 배포합니다. 포함된 제3자 dependency와 asset은 각자의 license를 따릅니다.
+
 ## 현재 지원 범위
 
 | Driver | 용도 | 상태 |
