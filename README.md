@@ -283,4 +283,4 @@ Sigloo는 현재 macOS·CLI 중심의 private local beta입니다.
 - 공개 package publish와 원격 release는 별도 승인 후 진행합니다.
 - MCP는 canonical interface가 아니며 CLI가 기본 인터페이스입니다.
 
-브랜딩 자산은 [`docs/branding`](/Users/siglee/Desktop/project/private/sigloo/docs/branding)에 있습니다.
+브랜딩 자산은 [`docs/branding`](docs/branding)에 있습니다.
