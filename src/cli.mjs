@@ -8,6 +8,7 @@ import { AuthProfileStore, loginAuthProfile } from './auth-profile-store.mjs';
 import { SIGLOO_VERSION } from './version.mjs';
 import { runDesktopSpace } from './desktop-space.mjs';
 import { runPlaywrightTest } from './playwright-run.mjs';
+import { BrowserSessionStore } from './browser-session.mjs';
 
 const HELP = `Usage:
   sigloo doctor [--json]
@@ -29,6 +30,10 @@ const HELP = `Usage:
   sigloo playwright run [--name NAME] [--evidence-dir PATH] -- [PLAYWRIGHT ARG...]
   sigloo browser run --url URL --script PATH [--auth-profile PATH] [--viewer] [options]
   sigloo browser probe [--json]
+  sigloo browser session create NAME [--ttl 30m] [--json]
+  sigloo browser session list [--json]
+  sigloo browser session inspect NAME [--json]
+  sigloo browser session destroy NAME [--json]
   sigloo desktop run --app PATH --electron-path PATH [--script PATH] [--timeout-ms N] [-- ARG...]
 
 Commands:
@@ -340,6 +345,13 @@ export async function runCli(arguments_, {
       const report = await runBrowserSpaceSpike();
       printJson(report, output);
       return report.cleanup.resources_remaining ? 1 : 0;
+    }
+    if (command === 'browser' && rest[0] === 'session') {
+      const action = rest[1]; const store = new BrowserSessionStore(); const name = rest[2];
+      if (action === 'create') { if (!name) throw new Error('browser session create requires NAME'); const result = await store.create(name); if (rest.includes('--json')) printJson(result, output); else output.write(`${result.name}  ${result.cdp_url}\n`); return 0; }
+      if (action === 'list') { const result = await store.list(); printJson(result, output); return 0; }
+      if (action === 'inspect' || action === 'destroy') { if (!name) throw new Error(`browser session ${action} requires NAME`); const result = action === 'inspect' ? await store.inspect(name) : await store.destroy(name); printJson(result, output); return 0; }
+      throw new Error('browser session requires create, list, inspect or destroy');
     }
     if (command === 'browser' && rest[0] === 'run') {
       const options = parseBrowserRun(rest.slice(1));
