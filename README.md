@@ -1,31 +1,30 @@
 # Sigloo
 
-Sigloo is a local-first, CLI-first E2E Space Runtime for AI agents and developers.
+Sigloo는 AI Agent와 개발자가 브라우저·프로세스·Electron 앱을 사용자 환경과 분리해 E2E 테스트할 수 있도록 하는 로컬 우선 CLI Space Runtime입니다.
 
-It creates isolated spaces for browser, process, application and future desktop testing while keeping lifecycle,
-ownership, observation, evidence and cleanup consistent across drivers.
+핵심 원칙은 간단합니다.
 
-## Product direction
+- 테스트마다 독립된 Space를 만든다.
+- 기존 테스트 명령은 가능한 그대로 실행한다.
+- 브라우저·앱·프로세스의 lifecycle을 Sigloo가 관리한다.
+- 로그·스크린샷·trace·assertion·cleanup 결과를 evidence로 남긴다.
+- 테스트가 끝나면 남은 리소스가 없는지 확인한다.
 
-- Command: `sigloo`
-- Companion Skill: `$sigloo`
-- Initial platform: macOS
-- Initial surfaces: browser, shell and Electron
-- Browser authentication: dedicated Auth Profiles with per-Space derived state
-- Viewer: optional and read-only by default
-- MCP: not part of the initial canonical interface
+현재 버전은 `0.1.0` 로컬 베타입니다. 공개 package publish는 아직 하지 않았습니다.
 
-The CLI is currently installed from a local checkout. No package is published yet.
+## 현재 지원 범위
 
-Current local beta: `0.1.0`.
+| Driver | 용도 | 상태 |
+| --- | --- | --- |
+| Browser Space | BrowserContext, Auth Profile, 웹 E2E | experimental |
+| Process Space | npm, shell, Node, Playwright 등 기존 명령 | prototype |
+| Desktop Space | offscreen Electron, renderer, IPC, terminal | experimental |
 
-Branding assets live in [`docs/branding`](/Users/siglee/Desktop/project/private/sigloo/docs/branding), including the
-Sigloo mark, wordmark and macOS `.icns` icon generated from the selected terminal-igloo direction.
+Sigloo는 Playwright나 다른 테스트 프레임워크를 대체하지 않습니다. 기존 명령을 그대로 실행할 수 있고, 필요할 때 Sigloo 전용 Browser/Desktop API를 사용할 수 있습니다.
 
-## Local install
+## 설치
 
-Install a content-addressed release and the `sigloo` launcher, then initialize its private data root and companion
-Codex Skill:
+현재는 로컬 checkout에서 content-addressed release를 설치합니다.
 
 ```bash
 node scripts/install-local.mjs install
@@ -33,39 +32,75 @@ sigloo setup --json
 sigloo agent install codex --json
 ```
 
-The defaults are `~/.local/share/sigloo` for releases and runtime data, `~/.local/bin/sigloo` for the launcher,
-and `~/.codex/skills/sigloo/SKILL.md` for `$sigloo`. Add `~/.local/bin` to `PATH` if needed, and start a new Codex
-session after installing the Skill so discovery is refreshed. Re-running `install` is an atomic, idempotent update.
-The installer refuses to replace launchers it does not own.
+설치 기본 경로:
 
-`sigloo setup` also recovers marked Browser profiles left by a terminated Sigloo process. Chrome is launched
-through a watchdog whose parent pipe closes on a crash, preventing the tested parent-termination orphan case.
+- release/runtime: `~/.local/share/sigloo`
+- CLI launcher: `~/.local/bin/sigloo`
+- Codex Skill: `~/.codex/skills/`
 
-To remove only the launcher while retaining releases and user data:
+설치 후 새 터미널과 새 Codex 세션을 시작하면 Skill 탐색이 갱신됩니다.
+
+설치본은 immutable digest로 보관되며, 반복 설치는 atomic/idempotent update로 동작합니다. launcher를 제거하되 release와 사용자 데이터를 보존하려면:
 
 ```bash
 node scripts/install-local.mjs uninstall
 ```
 
-## CLI
-
-Run the local CLI directly from the repository:
+이전 release로 되돌리려면:
 
 ```bash
-node bin/sigloo.mjs doctor --json
-node bin/sigloo.mjs create checkout --ttl 30m --json
-node bin/sigloo.mjs run checkout -- node /absolute/path/to/smoke-test.mjs
-node bin/sigloo.mjs inspect checkout --json
-node bin/sigloo.mjs report checkout --json
-node bin/sigloo.mjs destroy checkout --json
-node bin/sigloo.mjs run --name smoke -- node /absolute/path/to/smoke-test.mjs
-node bin/sigloo.mjs browser run --url https://app.example.test --script ./e2e.mjs --auth-profile ./auth.json
-node bin/sigloo.mjs browser run --url https://app.example.test --script ./e2e.mjs --auth-profile ./auth.json --viewer
-node bin/sigloo.mjs browser probe --json
-node bin/sigloo.mjs desktop run --app ./my-electron-app --electron-path /path/to/electron
+node scripts/install-local.mjs rollback \
+  --digest <64-character-release-sha256> \
+  --install-root ~/.local/share/sigloo \
+  --bin-dir ~/.local/bin
 ```
 
-Create and select a dedicated Auth Profile once, then refresh it only through an explicit login session:
+## 기본 점검
+
+```bash
+sigloo --version
+sigloo doctor --json
+sigloo setup --json
+```
+
+`setup`은 이전에 중단된 Sigloo Browser 임시 프로필을 검사하고, 안전하게 회수할 수 있는 항목을 복구합니다.
+
+## 1. Process Space — 기존 명령 그대로 실행
+
+기존 npm, shell, Node, Playwright 명령을 바꾸지 않고 격리된 Space에서 실행합니다.
+
+```bash
+sigloo run \
+  --name checkout-e2e \
+  --evidence-dir .sigloo/evidence \
+  -- npm test
+```
+
+Playwright도 기존 명령 그대로 실행할 수 있습니다.
+
+```bash
+sigloo run \
+  --name playwright-e2e \
+  -- npx playwright test
+```
+
+자식 프로세스에는 다음 경로가 전달됩니다.
+
+- `SIGLOO_SPACE_ID`
+- `SIGLOO_SPACE_DIR`
+- `SIGLOO_ARTIFACT_DIR`
+- `SIGLOO_LOG_DIR`
+- `SIGLOO_TRACE_DIR`
+- `SIGLOO_REPORT_DIR`
+- `SIGLOO_SCREENSHOT_DIR`
+
+Process Space는 프로젝트 작업 디렉터리를 유지합니다. 따라서 기존 명령은 그대로 실행되지만 프로젝트 파일을 수정할 수 있습니다. VM·container·OS 보안 샌드박스가 아닙니다.
+
+## 2. Browser Space — 웹 E2E
+
+### Auth Profile 만들기
+
+로그인 상태는 일반 브라우저 프로필과 섞지 않고 명시적인 Auth Profile로 관리합니다.
 
 ```bash
 sigloo auth create account --origin https://app.example.test
@@ -73,46 +108,179 @@ sigloo auth select account
 sigloo auth login account --url https://app.example.test/login
 ```
 
-`auth login` prints a temporary loopback Viewer. Take control, complete the login, then press `Save login`.
-The profile is stored owner-only and becomes the default for later `browser run` commands when
-`--auth-profile` is omitted. Ordinary Browser Space changes still never merge back.
+`auth login`은 임시 Viewer를 엽니다. 사용자가 `Take control`을 선택해 로그인하고 `Save login`을 눌러야만 상태가 저장됩니다. 비밀번호·cookie·token 원문은 CLI 결과나 evidence에 기록하지 않습니다.
 
-`sigloo run` preserves the caller's project working directory so existing suites run unchanged, while assigning a
-separate scratch directory and artifact paths. It emits a cleanup receipt plus private evidence under
-`.sigloo/evidence`. It is not an OS security sandbox and does not prevent project writes. `browser probe` verifies
-the BrowserContext isolation primitive independently from a test script.
+### Browser script 실행
 
-`sigloo create` makes a named Space with a stable ID and bounded TTL. A later CLI process can `inspect` or
-`run` it by name or ID. Persistent Space metadata defaults to `~/.local/share/sigloo`; tests and managed installs
-can override it with `SIGLOO_DATA_ROOT`. Ownership is a logical local boundary keyed by `SIGLOO_OWNER_ID` (or the
-current uid by default), not an OS security boundary. `destroy` and TTL expiry remove the Space directory and
-record cleanup separately from the test result.
+```js
+export default async function (page) {
+  const snapshot = await page.snapshot()
 
-`sigloo run <space> -- <existing command>` does not introduce a test DSL. Existing Playwright and shell suites
-keep their original command. The child receives `SIGLOO_LOG_DIR`, `SIGLOO_TRACE_DIR`, `SIGLOO_REPORT_DIR`,
-`SIGLOO_SCREENSHOT_DIR` and `SIGLOO_ARTIFACT_DIR`; configure the existing tool to write optional outputs there.
-Sigloo always captures stdout/stderr privately and inventories artifact paths and byte counts in the bounded
-report. Use `sigloo report <space>` from a later CLI process while the Space evidence still exists.
+  page.assert(
+    'login-page-visible',
+    snapshot.elements.some((element) => element.name === '로그인')
+  )
 
-`browser run` executes a trusted local JavaScript test in a fresh, headless BrowserContext. Its explicit Auth
-Profile is owner-only and remains unchanged. See `docs/reference/AUTH-PROFILE.md` for the v1 format and current
-same-origin boundary. `--viewer` prints a temporary loopback URL. It begins read-only; `Take control` pauses
-agent browser actions and enables bounded pointer/key input until `Return to agent` is selected. Closing during
-takeover interrupts waiting agent work. The Viewer closes with the run, and its token and input values are never
-written to evidence.
+  await page.screenshot('login-page')
+}
+```
 
-Browser test modules can use `snapshot()` to receive bounded, Space-local element references, then call
-`click(ref)`, `fill(ref, text)` or `key(ref, key)`. Fill text and key values are excluded from action evidence.
-Every browser resource is registered with the run Supervisor and closed in reverse dependency order; cleanup
-reports both individual resource results and the final `resources_remaining` invariant.
+```bash
+sigloo browser run \
+  --name login-smoke \
+  --url https://app.example.test \
+  --script ./e2e/smoke.mjs \
+  --auth-profile ~/.local/share/sigloo/auth/account.json
+```
 
-`sigloo desktop run` launches an Electron executable with a fresh temporary `userData` directory, bounded
-environment variables and private stdout/stderr evidence. The app path is passed as the first Electron argument;
-additional app arguments follow `--`. With `--script`, a local module can inspect `windows()`, evaluate bounded
-renderer expressions, assert named conditions and capture screenshots. This is an experimental Desktop Space, not
-an OS sandbox. Scripts may also use `click(selector)`, `fill(selector, value)`, `type(selector, value)`,
-`key(selector, key)`, `keyChord(keys)`, `clickAt(x, y)`, `drag(from, to)` and `close()`; input values are not
-written to action evidence. `reload()` is available for persistence and restart-style checks. Desktop children run
-offscreen by default, redact environment keys matching common secret patterns, and set
-`SIGLOO_DESKTOP_CLIPBOARD_MODE=isolated`; sensitive environment inheritance requires
-`SIGLOO_ALLOW_SENSITIVE_ENV=1` explicitly.
+Browser API:
+
+- `snapshot()` — 제한된 Space-local element reference 조회
+- `click(ref)` — snapshot reference 클릭
+- `fill(ref, value)` — 입력값 기록 없이 입력
+- `key(ref, key)` — 키 입력값 기록 없이 전송
+- `screenshot(name)` — private artifact 생성
+- `assert(name, condition)` — named assertion 기록
+
+Viewer가 필요하면 `--viewer`를 사용합니다. Viewer는 기본 read-only이고 사용자가 명시적으로 takeover해야 입력이 허용됩니다.
+
+## 3. Desktop Space — Electron E2E
+
+Desktop Space는 Electron 앱을 임시 `userData`와 offscreen renderer로 실행합니다. 테스트 창이 사용자의 화면·포커스·clipboard를 방해하지 않도록 하는 것이 기본입니다.
+
+```bash
+sigloo desktop run \
+  --name sigterm-smoke \
+  --app /path/to/sigterm/app \
+  --electron-path /path/to/Electron \
+  --script ./e2e/sigterm-smoke.mjs
+```
+
+예시:
+
+```js
+export default async function (desktop) {
+  const window = desktop
+    .windows()
+    .find((item) => item.url.endsWith('index.html'))
+
+  desktop.useWindow(window.id)
+
+  const ready = await desktop.evaluate(
+    'document.readyState === "complete"'
+  )
+  desktop.assert('renderer-ready', ready)
+
+  await desktop.screenshot('main-window')
+  desktop.close()
+}
+```
+
+지원 API:
+
+- `windows()` / `useWindow(id)` — 다중 renderer 선택
+- `evaluate(expression)` — renderer DOM/IPC 평가
+- `click(selector)` / `clickAt(x, y)` — DOM 또는 좌표 클릭
+- `fill(selector, value)` / `type(selector, value)` — 입력
+- `key(selector, key)` / `keyChord(keys)` — 키 입력·단축키
+- `drag(from, to)` — 좌표 drag
+- `reload()` — persistence/restart 검사
+- `screenshot(name)` — 화면 artifact
+- `close()` — 정상 종료 요청
+- `crashRenderer()` — crash cleanup 테스트
+
+Desktop child는 민감 환경변수를 기본 redaction합니다. 명시적 opt-in 없이는 token/password/secret/API key 계열 환경변수를 전달하지 않습니다.
+
+## 4. 테스트 리포트
+
+모든 Space는 JSON evidence와 bounded receipt를 남깁니다. 사람이 읽는 한글 Markdown 리포트로 변환하려면:
+
+```bash
+npm run report:render -- \
+  --input .sigloo/evidence/SPACE.json \
+  --output .sigloo/evidence/SPACE.md
+```
+
+리포트에는 다음이 포함됩니다.
+
+- 테스트 제목·목적·대상
+- 사전 조건
+- 실제 진행 단계
+- 성공 기준
+- assertion 결과
+- 수행 action/event
+- 실패 원인
+- screenshot·log·trace 경로
+- cleanup invariant
+
+입력값·cookie·storage·token·password·credential 원문은 리포트에 기록하지 않습니다.
+
+## 전체 검증
+
+변경 후 기본 검증:
+
+```bash
+npm run check
+npm test
+npm run release:preflight
+```
+
+Browser/Process 전체 gate:
+
+```bash
+npm run release:gate
+```
+
+SigTerm Desktop gate:
+
+```bash
+SIGLOO_DESKTOP_APP=/path/to/sigterm/app \
+SIGLOO_ELECTRON_PATH=/path/to/Electron \
+SIGLOO_DESKTOP_TERMINAL=1 \
+SIGLOO_DESKTOP_IPC=1 \
+npm run release:gate:desktop
+```
+
+통합 gate:
+
+```bash
+SIGLOO_DESKTOP_APP=/path/to/sigterm/app \
+SIGLOO_ELECTRON_PATH=/path/to/Electron \
+SIGLOO_DESKTOP_TERMINAL=1 \
+SIGLOO_DESKTOP_IPC=1 \
+npm run release:gate:all
+```
+
+통합 gate는 Browser 100회 반복, concurrent Space, crash recovery, install lifecycle, Desktop 반복 실행과 cleanup을 확인합니다.
+
+## 내장 Skills
+
+```bash
+sigloo agent install codex --json
+```
+
+설치되는 Skills:
+
+- `$sigloo` — 공통 Space lifecycle
+- `$sigloo-browser` — 웹 Browser E2E
+- `$sigloo-desktop` — Electron offscreen E2E
+- `$sigloo-process` — 기존 명령 격리 실행
+- `$sigloo-release` — gate·리포트·rollback
+
+Skill은 다음과 같은 자연어 요청에도 매핑됩니다.
+
+- “웹사이트 E2E 테스트해줘”
+- “Electron 앱을 화면에 띄우지 말고 검사해줘”
+- “기존 npm test를 격리 실행해줘”
+- “배포 전 전체 gate와 리포트를 만들어줘”
+
+## 프로젝트 경계
+
+Sigloo는 현재 macOS·CLI 중심의 private local beta입니다.
+
+- Desktop driver는 experimental입니다.
+- Process Space는 OS 보안 샌드박스가 아닙니다.
+- 공개 package publish와 원격 release는 별도 승인 후 진행합니다.
+- MCP는 canonical interface가 아니며 CLI가 기본 인터페이스입니다.
+
+브랜딩 자산은 [`docs/branding`](/Users/siglee/Desktop/project/private/sigloo/docs/branding)에 있습니다.
