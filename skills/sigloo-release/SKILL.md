@@ -37,3 +37,11 @@ Repoint the launcher to a retained immutable release without deleting runtime da
 node scripts/install-local.mjs rollback --digest HEX \
   --install-root ~/.local/share/sigloo --bin-dir ~/.local/bin
 ```
+
+## Human-readable report
+
+Render bounded JSON evidence without exposing input values:
+
+```bash
+npm run report:render -- --input .sigloo/evidence/SPACE.json --output .sigloo/evidence/SPACE.md
+```

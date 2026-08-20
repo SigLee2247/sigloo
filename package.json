@@ -15,6 +15,7 @@
     "release:gate:desktop": "node scripts/desktop-release-gate.mjs",
     "release:gate:all": "node scripts/release-gate-all.mjs",
     "release:preflight": "node scripts/package-preflight.mjs",
+    "report:render": "node scripts/render-e2e-report.mjs",
     "spike:browser": "node spikes/browser-space/run.mjs",
     "test": "node --test"
   }
