@@ -201,6 +201,7 @@ export default async function (desktop) {
 지원 API:
 
 - `windows()` / `useWindow(id)` — 다중 renderer 선택
+- `refreshWindows()` / `waitForWindow({ urlIncludes, timeoutMs })` — popup/modal renderer 대기
 - `evaluate(expression)` — renderer DOM/IPC 평가
 - `click(selector)` / `clickAt(x, y)` — DOM 또는 좌표 클릭
 - `fill(selector, value)` / `type(selector, value)` — 입력

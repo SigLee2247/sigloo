@@ -77,6 +77,10 @@ async function inspectRenderer(port, timeoutMs) {
   return { targets, page_url: null, title: null };
 }
 
+async function listRendererTargets(port) {
+  try { return await (await fetch(`http://127.0.0.1:${port}/json/list`)).json(); } catch { return []; }
+}
+
 async function cdpCall(target, method, params = {}) {
   const socket = new WebSocket(target.webSocketDebuggerUrl);
   return new Promise((resolveResult, reject) => {
@@ -143,6 +147,21 @@ export async function runDesktopSpace({
       const api = Object.freeze({
         spaceId: id,
         windows: () => renderer.targets.map((item) => ({ id: item.id, type: item.type, url: item.url, title: item.title })),
+        refreshWindows: async () => {
+          renderer.targets = await listRendererTargets(remoteDebuggingPort);
+          actions.push({ action: 'refreshWindows', at: new Date().toISOString() });
+          return renderer.targets.map((item) => ({ id: item.id, type: item.type, url: item.url, title: item.title }));
+        },
+        waitForWindow: async ({ urlIncludes = '', timeoutMs: waitTimeoutMs = 10_000 } = {}) => {
+          const deadline = Date.now() + waitTimeoutMs;
+          while (Date.now() < deadline) {
+            const targets = await listRendererTargets(remoteDebuggingPort);
+            const found = targets.find((item) => item.type === 'page' && item.webSocketDebuggerUrl && item.url.includes(urlIncludes));
+            if (found) { renderer.targets = targets; actions.push({ action: 'waitForWindow', target: found.id, at: new Date().toISOString() }); return { id: found.id, type: found.type, url: found.url, title: found.title }; }
+            await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+          }
+          throw new Error('Desktop window target did not appear before timeout');
+        },
         useWindow: (windowId) => {
           const selected = renderer.targets.find((item) => item.id === windowId && item.webSocketDebuggerUrl);
           if (!selected) throw new Error('Desktop window target was not found');
