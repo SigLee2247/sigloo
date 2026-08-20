@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { chmod, link, mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
+import { chmod, link, lstat, mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { rm } from 'node:fs/promises';
@@ -55,6 +55,16 @@ export class AuthProfileStore {
   async create(name, origin) {
     await this.initialize();
     return this.write(name, { schema_version: 1, origin: canonicalOrigin(origin), cookies: [], local_storage: {} }, { replace: false });
+  }
+
+  async import(name, source, { approved = false } = {}) {
+    if (!approved) throw new Error('Auth Profile import requires explicit --approve');
+    const metadata = await lstat(resolve(source));
+    if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error('Imported Auth Profile must be a regular file');
+    if ((metadata.mode & 0o077) !== 0) throw new Error('Imported Auth Profile permissions must be owner-only (0600)');
+    const profile = await loadAuthProfile(resolve(source));
+    const saved = await this.write(name, profile.profile);
+    return { ...saved, import: { approved: true, source_digest: profile.digest } };
   }
 
   async write(name, profile, { replace = true } = {}) {

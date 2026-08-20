@@ -15,6 +15,7 @@ const HELP = `Usage:
   sigloo setup [--json]
   sigloo agent install codex [--json]
   sigloo auth create NAME --origin ORIGIN [--json]
+  sigloo auth import NAME --source PROFILE.json --approve [--json]
   sigloo auth list [--json]
   sigloo auth inspect NAME [--json]
   sigloo auth select NAME [--json]
@@ -227,7 +228,7 @@ function parseAuth(command, arguments_) {
   for (let index = 0; index < arguments_.length; index += 1) {
     const token = arguments_[index];
     if (token === '--json') continue;
-    if (['--origin', '--url', '--timeout-ms'].includes(token)) {
+    if (['--origin', '--url', '--timeout-ms', '--source'].includes(token)) {
       const value = arguments_[index + 1];
       if (!value) throw new Error(`${token} requires a value`);
       if (token === '--origin') options.origin = value;
@@ -238,20 +239,24 @@ function parseAuth(command, arguments_) {
           throw new Error('--timeout-ms must be an integer between 1000 and 900000');
         }
       }
+      if (token === '--source') options.source = value;
       index += 1;
       continue;
     }
+    if (token === '--approve') { options.approved = true; continue; }
     if (token.startsWith('-')) throw new Error(`Unknown auth option: ${token}`);
     positional.push(token);
   }
   if (command === 'list') {
-    if (positional.length > 0 || options.origin || options.url || options.timeoutMs) throw new Error('auth list does not accept arguments');
+    if (positional.length > 0 || options.origin || options.url || options.timeoutMs || options.source || options.approved) throw new Error('auth list does not accept arguments');
     return options;
   }
   if (positional.length !== 1) throw new Error(`auth ${command} requires one profile name`);
   options.name = positional[0];
-  if (command === 'create' && !options.origin) throw new Error('auth create requires --origin');
+    if (command === 'create' && !options.origin) throw new Error('auth create requires --origin');
+    if (command === 'import' && (!options.source || !options.approved)) throw new Error('auth import requires --source and --approve');
   if (command !== 'create' && options.origin) throw new Error(`auth ${command} does not accept --origin`);
+  if (command !== 'import' && (options.source || options.approved)) throw new Error(`auth ${command} does not accept import options`);
   if (command !== 'login' && (options.url || options.timeoutMs)) throw new Error(`auth ${command} does not accept login options`);
   return options;
 }
@@ -295,11 +300,12 @@ export async function runCli(arguments_, {
     }
     if (command === 'auth') {
       const authCommand = rest[0];
-      if (!['create', 'list', 'inspect', 'select', 'login'].includes(authCommand)) throw new Error('auth requires create, list, inspect, select or login');
+      if (!['create', 'import', 'list', 'inspect', 'select', 'login'].includes(authCommand)) throw new Error('auth requires create, import, list, inspect, select or login');
       const options = parseAuth(authCommand, rest.slice(1));
       const store = new AuthProfileStore();
       let result;
       if (authCommand === 'create') result = await store.create(options.name, options.origin);
+      if (authCommand === 'import') result = await store.import(options.name, options.source, { approved: options.approved });
       if (authCommand === 'list') result = await store.list();
       if (authCommand === 'inspect') result = await store.inspect(options.name);
       if (authCommand === 'select') result = await store.select(options.name);
