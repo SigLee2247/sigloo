@@ -120,6 +120,19 @@ sigloo run --name minimal-check -- npm test
 
 ## 2. Browser Space — 웹 E2E
 
+### Persistent Browser Session
+
+장시간 브라우저 상태를 유지하거나 다른 CLI 프로세스에서 CDP endpoint에 재접속하려면 Persistent Session을 사용합니다. Sigloo가 만든 전용 profile만 유지하며, 사용자 Chrome profile과 섞이지 않습니다.
+
+```bash
+sigloo browser session create work --ttl 2h --json
+sigloo browser session list --json
+sigloo browser session inspect work --json
+sigloo browser session destroy work --json
+```
+
+`inspect` 결과의 `cdp_url`은 승인된 Playwright/Puppeteer 등 외부 runner가 연결할 수 있는 endpoint입니다. TTL 만료나 `destroy` 후에는 Chrome process와 profile directory를 함께 정리합니다.
+
 ### Auth Profile 만들기
 
 로그인 상태는 일반 브라우저 프로필과 섞지 않고 명시적인 Auth Profile로 관리합니다.
@@ -220,6 +233,15 @@ export default async function (desktop) {
 - `setInputFiles(selector, paths)` — native picker 없이 file input 주입
 - `handleDialog({ accept, promptText })` — JavaScript dialog 처리
 - `menu(id)` — 앱이 제공하는 offscreen native menu bridge 호출
+
+`menu(id)`는 임의의 macOS 메뉴를 강제로 조작하는 기능이 아닙니다. Electron 앱이 offscreen 전용 IPC bridge를 제공해야 하며, SigTerm은 `menu:invoke`의 승인된 메뉴 ID만 허용합니다. OS folder picker는 화면 방해를 막기 위해 offscreen 모드에서 차단하고, file input은 `setInputFiles`로 대체합니다.
+
+Desktop 앱은 다음 환경 계약을 지켜야 합니다.
+
+- `SIGLOO_DESKTOP_MODE=offscreen`일 때 창을 표시하지 않는다.
+- 사용자 clipboard 대신 Space-local clipboard를 사용한다.
+- native dialog는 offscreen에서 차단하거나 앱 전용 IPC로 대체한다.
+- 테스트 종료 시 앱이 `close()` 요청에 응답한다.
 - `reload()` — persistence/restart 검사
 - `screenshot(name)` — 화면 artifact
 - `close()` — 정상 종료 요청
