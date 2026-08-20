@@ -344,7 +344,7 @@ export async function runCli(arguments_, {
     if (command === 'browser' && rest[0] === 'run') {
       const options = parseBrowserRun(rest.slice(1));
       if (!options.authProfile) options.authProfile = (await new AuthProfileStore().selected()).path;
-      const { report, evidencePath } = await runBrowserTestSpace({
+      const { report, evidencePath, markdownPath } = await runBrowserTestSpace({
         ...options,
         invocationDirectory,
         onViewerReady(info) {
@@ -360,6 +360,7 @@ export async function runCli(arguments_, {
         space_id: report.space_id,
         status: report.status,
         evidence: evidencePath,
+        report: markdownPath,
         artifacts: report.artifacts.map((artifact) => artifact.path),
         auth_profile_unchanged: report.auth_profile.unchanged,
         viewer: report.viewer,
@@ -369,14 +370,14 @@ export async function runCli(arguments_, {
     }
     if (command === 'desktop' && rest[0] === 'run') {
       const options = parseDesktopRun(rest.slice(1));
-      const { report, evidencePath } = await runDesktopSpace({ ...options, invocationDirectory });
-      output.write(`SIGLOO_RECEIPT ${JSON.stringify({ space_id: report.space_id, status: report.status, evidence: evidencePath, artifacts: report.artifacts.items.map((artifact) => artifact.path), cleanup: report.cleanup })}\n`);
+      const { report, evidencePath, markdownPath } = await runDesktopSpace({ ...options, invocationDirectory });
+      output.write(`SIGLOO_RECEIPT ${JSON.stringify({ space_id: report.space_id, status: report.status, evidence: evidencePath, report: markdownPath, artifacts: report.artifacts.items.map((artifact) => artifact.path), cleanup: report.cleanup })}\n`);
       return report.status === 'passed' ? 0 : 1;
     }
     if (command === 'playwright' && rest[0] === 'run') {
       const options = parsePlaywrightRun(rest.slice(1));
-      const { report, evidencePath } = await runPlaywrightTest({ ...options, invocationDirectory });
-      output.write(`SIGLOO_RECEIPT ${JSON.stringify({ space_id: report.space_id, status: report.status, evidence: evidencePath, artifacts: report.artifacts.items.map((artifact) => artifact.path), cleanup: report.cleanup })}\n`);
+      const { report, evidencePath, markdownPath } = await runPlaywrightTest({ ...options, invocationDirectory });
+      output.write(`SIGLOO_RECEIPT ${JSON.stringify({ space_id: report.space_id, status: report.status, evidence: evidencePath, report: markdownPath, artifacts: report.artifacts.items.map((artifact) => artifact.path), cleanup: report.cleanup })}\n`);
       return report.result.exit_code ?? 1;
     }
     if (command === 'run') {
@@ -388,7 +389,7 @@ export async function runCli(arguments_, {
         persistentSpace = await store.resolveRunnable(options.space);
         options.name = persistentSpace.name;
       }
-      const { report, evidencePath } = await runProcessSpace({
+      const { report, evidencePath, markdownPath } = await runProcessSpace({
         ...options, persistentSpace, invocationDirectory,
       });
       if (store) await store.recordRun(options.space, { status: report.status, evidencePath });
@@ -396,6 +397,7 @@ export async function runCli(arguments_, {
         space_id: report.space_id,
         status: report.status,
         evidence: evidencePath,
+        report: markdownPath,
         artifacts: report.artifacts.items.map((artifact) => artifact.path),
         cleanup: report.cleanup,
       })}\n`);
