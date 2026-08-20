@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Sigloo mark</title>
+  <desc id="desc">An igloo with a terminal prompt in its doorway.</desc>
+  <rect width="256" height="256" rx="56" fill="#102A43"/>
+  <path d="M35 174a93 93 0 0 1 186 0v25H35z" fill="#8ED8FF" stroke="#DDF5FF" stroke-width="8"/>
+  <path d="M48 144h160M42 116h172M61 88h134M92 62h72" fill="none" stroke="#DDF5FF" stroke-width="12" stroke-linecap="round"/>
+  <path d="M93 199v-40c0-24 16-39 35-39s35 15 35 39v40" fill="#102A43" stroke="#DDF5FF" stroke-width="10"/>
+  <path d="m112 163 15 12 15-12M137 178h13" fill="none" stroke="#65E6C1" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
