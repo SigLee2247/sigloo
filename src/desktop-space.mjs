@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { randomInt } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { writeRunReports } from './report-renderer.mjs';
 
 function createSpaceId(name) {
   const time = new Date().toISOString().replaceAll(/[-:.TZ]/g, '');
@@ -259,7 +260,6 @@ export async function runDesktopSpace({
     artifacts: { root: artifactRoot, items: [{ kind: 'logs', path: stdoutPath }, { kind: 'logs', path: stderrPath }, ...artifacts] },
     cleanup: { user_data_removed: userDataRemoved, resources_remaining: !userDataRemoved },
   };
-  await mkdir(evidenceRoot, { recursive: true });
-  await writeFile(evidencePath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
-  return { report, evidencePath };
+  const reportPaths = await writeRunReports(report, evidenceRoot, evidencePath);
+  return { report, ...reportPaths };
 }

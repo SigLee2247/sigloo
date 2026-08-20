@@ -8,6 +8,7 @@ import { loadAuthProfile, sha256 } from './browser/auth-profile.mjs';
 import { BrowserViewer } from './viewer/read-only-viewer.mjs';
 import { ResourceSupervisor } from './supervisor/resource-supervisor.mjs';
 import { createManagedTemporaryDirectory } from './supervisor/managed-temporary.mjs';
+import { writeRunReports } from './report-renderer.mjs';
 
 const DEFAULT_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
@@ -249,7 +250,6 @@ export async function runBrowserTestSpace({
     failure,
     cleanup,
   };
-  await mkdir(evidenceRoot, { recursive: true });
-  await writeFile(evidencePath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
-  return { report, evidencePath };
+  const reportPaths = await writeRunReports(report, evidenceRoot, evidencePath);
+  return { report, ...reportPaths };
 }

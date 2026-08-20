@@ -5,6 +5,7 @@ import { access, lstat, mkdir, mkdtemp, readdir, realpath, rm, writeFile } from 
 import { once } from 'node:events';
 import { tmpdir } from 'node:os';
 import { basename, join, relative, resolve } from 'node:path';
+import { writeRunReports } from './report-renderer.mjs';
 
 function digest(value) {
   return `sha256:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
@@ -167,8 +168,6 @@ export async function runProcessSpace({
       resources_remaining: persistentSpace ? false : !directoryRemoved,
     },
   };
-  await mkdir(evidenceRoot, { recursive: true });
-  await writeFile(evidencePath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
-
-  return { report, evidencePath };
+  const reportPaths = await writeRunReports(report, evidenceRoot, evidencePath);
+  return { report, ...reportPaths };
 }
