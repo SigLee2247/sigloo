@@ -132,6 +132,16 @@ sigloo auth login account --url https://app.example.test/login
 
 `auth login`은 임시 Viewer를 엽니다. 사용자가 `Take control`을 선택해 로그인하고 `Save login`을 눌러야만 상태가 저장됩니다. 비밀번호·cookie·token 원문은 CLI 결과나 evidence에 기록하지 않습니다.
 
+기존 브라우저 user-data 디렉터리를 가져오려면 반드시 경로와 승인을 명시합니다. Sigloo는 원본을 직접 사용하지 않고 관리 디렉터리로 복사합니다.
+
+```bash
+sigloo browser session import work \
+  --source-dir "$HOME/Library/Application Support/Google/Chrome" \
+  --approve --json
+```
+
+원본 profile의 동시 사용·OS credential 암호화 상태에 따라 일부 로그인 상태는 재현되지 않을 수 있습니다. 원본을 삭제하거나 역병합하지 않습니다.
+
 ### Browser script 실행
 
 ```js

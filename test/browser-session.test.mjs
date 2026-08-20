@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -18,6 +18,10 @@ test('persistent Browser Session creates, lists, inspects and destroys an isolat
     assert.equal((await store.inspect('persistent-smoke')).pid, created.pid);
     assert.deepEqual(await store.destroy('persistent-smoke'), { name: 'persistent-smoke', destroyed: true, resources_remaining: false });
     assert.equal((await store.list()).length, 0);
+    const source = join(root, 'approved-profile'); await mkdir(source); await writeFile(join(source, 'marker'), 'fixture');
+    const imported = await store.import('imported-smoke', source, { approved: true, ttlMs: 60_000 });
+    assert.equal(imported.imported, true);
+    await store.destroy('imported-smoke');
   } finally {
     if (previous === undefined) delete process.env.SIGLOO_DATA_ROOT; else process.env.SIGLOO_DATA_ROOT = previous;
     await rm(root, { recursive: true, force: true });

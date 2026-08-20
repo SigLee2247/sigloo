@@ -14,7 +14,7 @@ Persistent Session은 Sigloo가 만든 전용 Browser profile을 유지하는 �
 sigloo auth import account --source ./approved-auth.json --approve --json
 ```
 
-Chrome user-data 디렉터리에서 직접 추출하는 import는 별도 승인 UI와 OS별 검증이 완료되기 전까지 지원하지 않습니다.
+Chrome user-data 디렉터리 import는 `sigloo browser session import NAME --source-dir PATH --approve`로 명시적 승인한 경우에만 지원합니다. 원본은 읽기용 source로 두고 관리 디렉터리에 복사합니다. OS credential 암호화와 동시 사용 상태에 따라 로그인 재현이 보장되지 않을 수 있습니다.
 
 - 기본값은 거부
 - 사용자 승인 없이는 profile/cookie DB를 읽지 않음

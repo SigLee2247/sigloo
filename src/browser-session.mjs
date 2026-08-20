@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto';
-import { access, chmod, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { access, chmod, cp, lstat, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -29,6 +29,18 @@ export class BrowserSessionStore {
     child.unref();
     const now = new Date(); const record = { schema_version: 1, name, pid: child.pid, port, profile_dir: profileDir, created_at: now.toISOString(), expires_at: new Date(now.getTime() + ttlMs).toISOString(), state: 'ready' };
     try { await waitReady(port); await writeFile(metadataPath, `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 }); } catch (error) { try { process.kill(child.pid, 'SIGTERM'); } catch {} await rm(profileDir, { recursive: true, force: true }); throw error; }
+    return publicSession(record);
+  }
+  async import(name, sourceDir, { approved = false, ttlMs = 30 * 60_000, chromePath = process.env.SIGLOO_CHROME_PATH ?? DEFAULT_CHROME } = {}) {
+    if (!approved) throw new Error('Browser profile import requires explicit --approve');
+    const source = resolve(sourceDir); const sourceMeta = await lstat(source);
+    if (!sourceMeta.isDirectory() || sourceMeta.isSymbolicLink()) throw new Error('Imported browser profile must be a regular directory');
+    await this.initialize(); const metadataPath = pathFor(name); const profileDir = join(rootFor(), `${name}-import-${randomUUID()}`);
+    try { await access(metadataPath); throw new Error(`Browser Session already exists: ${name}`); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    await cp(source, profileDir, { recursive: true, force: false, errorOnExist: true });
+    const port = randomInt(40_000, 49_000); const child = spawn(chromePath, ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profileDir}`, '--no-first-run', '--no-default-browser-check', '--disable-sync', 'about:blank'], { detached: true, stdio: 'ignore' });
+    child.unref(); const now = new Date(); const record = { schema_version: 1, name, pid: child.pid, port, profile_dir: profileDir, imported: true, source_digest: `directory:${sourceMeta.ino ?? 'unknown'}:${sourceMeta.mtimeMs}`, created_at: now.toISOString(), expires_at: new Date(now.getTime() + ttlMs).toISOString(), state: 'ready' };
+    try { await waitReady(port); await writeFile(metadataPath, `${JSON.stringify(record, null, 2)}\n`, { mode: '0600' }); } catch (error) { try { process.kill(child.pid, 'SIGTERM'); } catch {} await rm(profileDir, { recursive: true, force: true }); throw error; }
     return publicSession(record);
   }
   async inspect(name) { const record = JSON.parse(await readFile(pathFor(name), 'utf8')); return publicSession(record); }
