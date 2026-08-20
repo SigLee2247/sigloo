@@ -28,7 +28,7 @@ export async function loadAuthProfile(path, invocationDirectory = process.cwd())
   } catch {
     throw new Error('Auth Profile must contain valid JSON');
   }
-  const allowed = ['schema_version', 'origin', 'cookies', 'local_storage'];
+  const allowed = ['schema_version', 'origin', 'origins', 'cookies', 'local_storage'];
   if (!profile || typeof profile !== 'object' || Array.isArray(profile)) {
     throw new Error('Auth Profile must be an object');
   }
@@ -45,6 +45,16 @@ export async function loadAuthProfile(path, invocationDirectory = process.cwd())
   } catch {
     throw new Error('Auth Profile origin must be a canonical URL origin');
   }
+  const origins = profile.origins ?? [origin];
+  if (!Array.isArray(origins) || origins.length < 1 || origins.length > 32) throw new Error('Auth Profile origins must be an array of 1-32 origins');
+  const canonicalOrigins = origins.map((value) => {
+    try {
+      const parsed = new URL(value);
+      if (!['http:', 'https:'].includes(parsed.protocol) || parsed.origin !== value) throw new Error();
+      return parsed.origin;
+    } catch { throw new Error('Auth Profile origins must contain canonical HTTP(S) origins'); }
+  });
+  if (!canonicalOrigins.includes(origin)) throw new Error('Auth Profile origins must include the primary origin');
   if (!Array.isArray(profile.cookies)) throw new Error('Auth Profile cookies must be an array');
   if (profile.cookies.length > 1_000) throw new Error('Auth Profile must not contain more than 1000 cookies');
   const cookies = profile.cookies.map((cookie) => {
@@ -71,6 +81,7 @@ export async function loadAuthProfile(path, invocationDirectory = process.cwd())
     profile: {
       schema_version: 1,
       origin,
+      origins: canonicalOrigins,
       cookies,
       local_storage: { ...profile.local_storage },
     },

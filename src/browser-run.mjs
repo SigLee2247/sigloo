@@ -69,8 +69,8 @@ export async function runBrowserTestSpace({
   }
   const initialUrl = parsedUrl.href;
   const loadedProfile = await loadAuthProfile(authProfile, invocationDirectory);
-  if (new URL(initialUrl).origin !== loadedProfile.profile.origin) {
-    throw new Error('Initial URL origin must match the Auth Profile origin');
+  if (!(loadedProfile.profile.origins ?? [loadedProfile.profile.origin]).includes(new URL(initialUrl).origin)) {
+    throw new Error('Initial URL origin is not included in the Auth Profile origins allowlist');
   }
   const loadedTest = await loadTestModule(script, invocationDirectory);
   if (typeof viewer !== 'boolean') throw new Error('Viewer option must be boolean');

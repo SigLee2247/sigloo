@@ -8,9 +8,22 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import test from 'node:test';
 import { AuthProfileStore, loginAuthProfile } from '../src/auth-profile-store.mjs';
+import { loadAuthProfile } from '../src/browser/auth-profile.mjs';
 
 const execFileAsync = promisify(execFile);
 const cli = new URL('../bin/sigloo.mjs', import.meta.url).pathname;
+
+test('Auth Profile accepts an explicit cross-origin allowlist and rejects malformed entries', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'sigloo-auth-origin-test-'));
+  const path = join(root, 'profile.json');
+  try {
+    await writeFile(path, `${JSON.stringify({ schema_version: 1, origin: 'https://app.example.test', origins: ['https://app.example.test', 'https://id.example.test'], cookies: [], local_storage: {} })}\n`, { mode: 0o600 });
+    const loaded = await loadAuthProfile(path);
+    assert.deepEqual(loaded.profile.origins, ['https://app.example.test', 'https://id.example.test']);
+    await writeFile(path, `${JSON.stringify({ schema_version: 1, origin: 'https://app.example.test', origins: ['https://app.example.test/path'], cookies: [], local_storage: {} })}\n`, { mode: 0o600 });
+    await assert.rejects(loadAuthProfile(path), /canonical HTTP\(S\) origins/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
 
 test('Auth Profiles create, select and explicitly save login state without exposing values', async () => {
   const root = await mkdtemp(join(tmpdir(), 'sigloo-auth-profile-test-'));
