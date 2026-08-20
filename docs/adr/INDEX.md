@@ -14,3 +14,4 @@
 | ADR-SIGLOO-010 | accepted | Reference-based Browser Actions and ordered resource supervision |
 | ADR-SIGLOO-011 | accepted | Managed Auth Profiles with explicit Viewer login save |
 | ADR-SIGLOO-012 | accepted | Crash-safe Chrome watchdog and MVP release gates |
+| ADR-SIGLOO-013 | proposed | Persistent Browser Session and approval-based profile import |
