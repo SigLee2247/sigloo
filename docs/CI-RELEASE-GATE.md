@@ -1,6 +1,6 @@
 # CI and release gate contract
 
-## Required gate
+## Required gate (manual)
 
 Every CI run executes:
 
@@ -11,6 +11,8 @@ npm run release:gate
 ```
 
 `release:gate` covers 100 Browser runs, concurrent isolation, crash recovery, install/update/uninstall and cleanup.
+The workflow is intentionally manual-only because Sigloo is currently a single-user private tool. Run it from the
+GitHub Actions UI with `workflow_dispatch` when a remote verification is needed.
 
 ## Desktop gate
 
